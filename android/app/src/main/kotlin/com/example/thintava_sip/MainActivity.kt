@@ -1,4 +1,4 @@
-package com.example.canteen_app
+package com.example.thintava_sip
 
 import io.flutter.embedding.android.FlutterActivity
 
