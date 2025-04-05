@@ -2,12 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+
 class OrderTrackingScreen extends StatelessWidget {
   const OrderTrackingScreen({super.key});
 
   Stream<DocumentSnapshot?> getLatestOrderStream() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const Stream.empty();
+
+    if (user == null) {
+      print("No user logged in, redirecting to login page");
+      // Redirect to login or show a message
+      return const Stream.empty();
+    }
 
     return FirebaseFirestore.instance
         .collection('orders')
@@ -34,9 +40,13 @@ class OrderTrackingScreen extends StatelessWidget {
           }
 
           final order = snapshot.data!.data() as Map<String, dynamic>;
-          final status = order['status'];
-          final total = order['total'];
-          final items = (order['items'] as Map<String, dynamic>).entries.map((e) => "${e.key}: ${e.value}").join('\n');
+          final status = order['status'] ?? 'Unknown';
+          final total = order['total'] ?? 0.0;
+          final items = (order['items'] as Map<String, dynamic>?)
+              ?.entries
+              .map((e) => "${e.key}: ${e.value}")
+              .join('\n') ??
+              'No items';
 
           return Padding(
             padding: const EdgeInsets.all(20.0),
