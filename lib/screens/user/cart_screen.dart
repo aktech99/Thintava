@@ -6,7 +6,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 class CartScreen extends StatefulWidget {
   final Map<String, int> cart;
 
-  const CartScreen({super.key, required this.cart});
+  const CartScreen({Key? key, required this.cart}) : super(key: key);
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -34,23 +34,56 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> fetchItems() async {
-    final snapshot = await FirebaseFirestore.instance.collection('menuItems').get();
+    final snapshot =
+        await FirebaseFirestore.instance.collection('menuItems').get();
     setState(() {
       for (var doc in snapshot.docs) {
         menuMap[doc.id] = doc.data();
       }
+      recalcTotal();
+    });
+  }
 
-      total = widget.cart.entries.fold(0, (sum, entry) {
-        final price = menuMap[entry.key]?['price'] ?? 0;
-        return sum + price * entry.value;
-      });
+  void recalcTotal() {
+    double newTotal = 0;
+    widget.cart.forEach((key, qty) {
+      final price = menuMap[key]?['price'] ?? 0;
+      newTotal += price * qty;
+    });
+    setState(() {
+      total = newTotal;
+    });
+  }
+
+  void increaseQuantity(String itemId) {
+    setState(() {
+      widget.cart[itemId] = (widget.cart[itemId] ?? 0) + 1;
+      recalcTotal();
+    });
+  }
+
+  void decreaseQuantity(String itemId) {
+    setState(() {
+      if (widget.cart[itemId] != null && widget.cart[itemId]! > 1) {
+        widget.cart[itemId] = widget.cart[itemId]! - 1;
+      } else {
+        widget.cart.remove(itemId);
+      }
+      recalcTotal();
+    });
+  }
+
+  void removeItem(String itemId) {
+    setState(() {
+      widget.cart.remove(itemId);
+      recalcTotal();
     });
   }
 
   void startPayment() {
     var options = {
-      'key': 'rzp_live_FBnjPJmPGZ9JHo', // Replace with your Razorpay test key
-      'amount': (total * 100).toInt(), // In paise
+      'key': 'rzp_live_FBnjPJmPGZ9JHo', // Replace with your Razorpay key
+      'amount': (total * 100).toInt(), // Amount in paise
       'name': 'Canteen Order',
       'description': 'Food Order Payment',
       'prefill': {
@@ -83,47 +116,212 @@ class _CartScreenState extends State<CartScreen> {
 
     await FirebaseFirestore.instance.collection('orders').add(order);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Order placed successfully!")),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Order placed successfully!")));
     Navigator.popUntil(context, (route) => route.isFirst);
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Payment failed!")),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Payment failed!")));
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("External Wallet selected.")),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("External Wallet selected.")));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Your Cart")),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              children: widget.cart.entries.map((entry) {
-                final item = menuMap[entry.key];
-                return ListTile(
-                  title: Text(item?['name'] ?? 'Item'),
-                  subtitle: Text("${entry.value} x ₹${item?['price']}"),
-                );
-              }).toList(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color.fromARGB(255, 255, 255, 255), Color.fromARGB(255, 255, 255, 255)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child:
+                  widget.cart.isEmpty
+                      ? const Center(child: Text("Your cart is empty"))
+                      : ListView.builder(
+                        padding: const EdgeInsets.all(8),
+                        itemCount: widget.cart.length,
+                        itemBuilder: (context, index) {
+                          final itemId = widget.cart.keys.elementAt(index);
+                          final quantity = widget.cart[itemId]!;
+                          final item = menuMap[itemId];
+                          if (item == null) return const SizedBox();
+                          final price = item['price'] ?? 0;
+                          return Card(
+                            elevation: 4,
+                            margin: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  // Food image
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child:
+                                        item['imageUrl'] != null
+                                            ? Image.network(
+                                              item['imageUrl'],
+                                              width: 80,
+                                              height: 80,
+                                              fit: BoxFit.cover,
+                                            )
+                                            : Container(
+                                              width: 80,
+                                              height: 80,
+                                              color: Colors.grey[300],
+                                              child: const Icon(
+                                                Icons.fastfood,
+                                                size: 40,
+                                              ),
+                                            ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  // Dish details
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item['name'] ?? 'Item',
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          "₹$price",
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.green,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          "Subtotal: ₹${price * quantity}",
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Quantity selector and delete button
+                                  Column(
+                                    children: [
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.remove_circle_outline,
+                                            ),
+                                            onPressed:
+                                                () => decreaseQuantity(itemId),
+                                          ),
+                                          AnimatedSwitcher(
+                                            duration: const Duration(
+                                              milliseconds: 300,
+                                            ),
+                                            transitionBuilder:
+                                                (child, animation) =>
+                                                    FadeTransition(
+                                                      opacity: animation,
+                                                      child: child,
+                                                    ),
+                                            child: Text(
+                                              '$quantity',
+                                              key: ValueKey<int>(quantity),
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.add_circle_outline,
+                                            ),
+                                            onPressed:
+                                                () => increaseQuantity(itemId),
+                                          ),
+                                        ],
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
+                                        ),
+                                        onPressed: () => removeItem(itemId),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
             ),
-          ),
-          Text("Total: ₹$total", style: const TextStyle(fontSize: 18)),
-          ElevatedButton(
-            onPressed: startPayment,
-            child: const Text("Pay & Place Order"),
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.white70,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    "Total: ₹$total",
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: startPayment,
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        backgroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        "Pay & Place Order",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
