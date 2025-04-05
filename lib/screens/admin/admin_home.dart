@@ -65,10 +65,7 @@ class AdminHome extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Theme.of(context).colorScheme.primary,
-                  Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                ],
+                colors: [Color(0xFF004D40), Color(0xFF1B5E20)],
               ),
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(40),

@@ -63,7 +63,7 @@ class _MenuScreenState extends State<MenuScreen> {
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color.fromARGB(255, 255, 255, 255), Color.fromARGB(255, 255, 255, 255)],
+              colors: [Color(0xFF004D40), Color(0xFF1B5E20)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -85,7 +85,7 @@ class _MenuScreenState extends State<MenuScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor:  Color(0xFF004D40),
                         ),
                         onChanged: (value) {
                           setState(() {});
@@ -171,7 +171,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                       : Container(
                                           width: 100,
                                           height: 100,
-                                          color: Colors.grey[300],
+                                          color: Color(0xFF1B5E20),
                                           child: const Icon(Icons.fastfood, size: 50),
                                         ),
                                 ),
@@ -193,7 +193,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                         "₹${data['price']}",
                                         style: const TextStyle(
                                           fontSize: 16,
-                                          color: Colors.grey,
+                                          color: Color(0xFF004D40),
                                         ),
                                       ),
                                     ],

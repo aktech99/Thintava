@@ -80,7 +80,7 @@ class _UserHomeState extends State<UserHome> with SingleTickerProviderStateMixin
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+            colors: [Color(0xFF004D40), Color(0xFF1B5E20)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),

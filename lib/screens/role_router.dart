@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:canteen_app/services/auth_service.dart';
-import 'package:canteen_app/screens/user/user_home.dart';
-import 'package:canteen_app/screens/kitchen/kitchen_home.dart';
+
 import 'package:canteen_app/screens/admin/admin_home.dart';
+import 'package:canteen_app/screens/kitchen/kitchen_home.dart';
+import 'package:canteen_app/screens/user/user_home.dart';
+import 'package:canteen_app/services/auth_service.dart';
+import 'package:flutter/material.dart';
 
 class RoleRouter extends StatelessWidget {
   final String uid;

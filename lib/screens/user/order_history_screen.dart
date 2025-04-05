@@ -24,6 +24,7 @@ class OrderHistoryScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text("My Orders")),
+      
       body: StreamBuilder(
         stream: ordersStream,
         builder: (context, snapshot) {

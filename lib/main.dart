@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:canteen_app/screens/kitchen/kitchen_home.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -107,6 +108,7 @@ class MyApp extends StatelessWidget {
         },
         '/track': (_) => const OrderTrackingScreen(),
         '/kitchen': (_) => const KitchenDashboard(),
+        '/kitchen-menu': (_) => const KitchenHome(),
         '/admin/menu': (_) => const MenuManagementScreen(),
         '/admin/home': (_) => const AdminHome(),
         '/history': (_) => const OrderHistoryScreen(),
@@ -145,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen> {
             if (role == 'admin') {
               Navigator.pushReplacementNamed(context, '/admin/home');
             } else if (role == 'kitchen') {
-              Navigator.pushReplacementNamed(context, '/kitchen');
+              Navigator.pushReplacementNamed(context, '/kitchen-menu');
             } else {
               Navigator.pushReplacementNamed(context, '/menu');
             }
