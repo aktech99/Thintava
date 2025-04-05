@@ -3,6 +3,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+// Helper function to capitalize status
+String capitalize(String s) => s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '';
+
 class KitchenDashboard extends StatelessWidget {
   const KitchenDashboard({super.key});
 
@@ -58,13 +61,17 @@ class KitchenDashboard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 6),
-                      Text("Items: ${data['items']?.join(', ') ?? 'N/A'}"),
+                      Text(
+                        "Items: ${(data['items'] is Map 
+                          ? (data['items'] as Map<String, dynamic>).entries.map((e) => '${e.key} (${e.value})').join(', ') 
+                          : 'N/A')}",
+                      ),
                       const SizedBox(height: 6),
-                      Text("Status: ${data['status']}")
+                      Text("Status: ${capitalize(data['status'])}"),
                     ],
                   ),
                   trailing: DropdownButton<String>(
-                    value: data['status'],
+                    value: capitalize(data['status']),
                     onChanged: (newStatus) {
                       if (newStatus != null) {
                         updateOrderStatus(order.id, newStatus);
