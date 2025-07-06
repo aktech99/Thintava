@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canteen_app/services/auth_service.dart';
-import 'package:canteen_app/widgets/session_checker.dart'; // Import SessionChecker
+import 'package:canteen_app/widgets/session_checker.dart';
 
 class UserHome extends StatefulWidget {
   const UserHome({Key? key}) : super(key: key);

@@ -8,7 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:provider/provider.dart'; // Add this import
+import 'package:provider/provider.dart';
 
 // Import modularized components
 import 'package:canteen_app/config/theme_config.dart';
@@ -17,7 +17,7 @@ import 'package:canteen_app/screens/splash/splash_screen.dart';
 import 'package:canteen_app/services/notification_service.dart';
 import 'package:canteen_app/utils/firebase_utils.dart';
 import 'package:canteen_app/services/auth_service.dart';
-import 'package:canteen_app/providers/cart_provider.dart'; // Add this import
+import 'package:canteen_app/providers/cart_provider.dart';
 
 // Initialize global plugins
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = 
@@ -172,12 +172,12 @@ class _ThintavaAppState extends State<ThintavaApp> {
   void initState() {
     super.initState();
     
-    // TEMPORARILY DISABLE SESSION LISTENER TO FIX LOGIN ISSUES
-    // authService.startSessionListener(() {
-    //   // This will be called if the user is logged out on another device
-    //   _handleForcedLogout();
-    // });
-    print('🚀 Thintava App initialized - Session management temporarily disabled');
+    // Start session listener for global session management
+    authService.startSessionListener(() {
+      // This will be called if the user is logged out on another device
+      _handleForcedLogout();
+    });
+    print('🚀 Thintava App initialized with session management');
   }
   
   void _handleForcedLogout() {
@@ -208,8 +208,7 @@ class _ThintavaAppState extends State<ThintavaApp> {
   
   @override
   void dispose() {
-    // TEMPORARILY DISABLE SESSION LISTENER
-    // authService.stopSessionListener();
+    authService.stopSessionListener();
     super.dispose();
   }
   
@@ -230,9 +229,8 @@ class _ThintavaAppState extends State<ThintavaApp> {
           );
         }
         
-        // WRAP YOUR MATERIALAPP WITH CHANGENOTIFIERPROVIDER
         return ChangeNotifierProvider(
-          create: (context) => CartProvider()..loadFromStorage(), // Load cart on app start
+          create: (context) => CartProvider()..loadFromStorage(),
           child: MaterialApp(
             title: 'Thintava',
             debugShowCheckedModeBanner: false,

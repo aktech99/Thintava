@@ -1,3 +1,4 @@
+// lib/screens/splash/splash_screen.dart - FIXED VERSION
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,7 +8,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:canteen_app/constants/food_quotes.dart';
 import 'package:canteen_app/services/auth_service.dart';
-import 'package:canteen_app/services/notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -22,15 +22,45 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   final AuthService _authService = AuthService();
-  String _statusMessage = "Preparing your experience...";
+  bool _hasNavigated = false; // Prevent multiple navigations
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
-    _setupOrderNotifications();
+    _setupFirebaseMessaging();
     _startListeningToAuth();
-    print('🎬 Enhanced splash screen initialized with order notifications');
+    
+    // Start session listener for forced logout detection
+    _authService.startSessionListener(() {
+      _handleForcedLogout();
+    });
+    print('🎬 Splash screen initialized');
+  }
+  
+  void _handleForcedLogout() {
+    if (mounted && !_hasNavigated) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('Logged Out', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          content: Text(
+            'You have been logged out because your account was logged in on another device.',
+            style: GoogleFonts.poppins(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _navigateToAuth();
+              },
+              child: Text('OK', style: GoogleFonts.poppins()),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   void _setupAnimations() {
@@ -51,124 +81,132 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     print('🎭 Animations set up');
   }
 
-  void _setupOrderNotifications() {
-    setState(() {
-      _statusMessage = "Setting up order notifications...";
-    });
-
+  void _setupFirebaseMessaging() {
     try {
-      // Order notification setup is handled in main.dart during app initialization
-      // Here we just confirm it's working
-      print('📱 Order notification system confirmed active');
-      
-      setState(() {
-        _statusMessage = "Order notifications ready!";
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        RemoteNotification? notification = message.notification;
+        AndroidNotification? android = message.notification?.android;
+
+        if (notification != null && android != null) {
+          FlutterLocalNotificationsPlugin().show(
+            notification.hashCode,
+            notification.title,
+            notification.body,
+            const NotificationDetails(
+              android: AndroidNotificationDetails(
+                'thintava_channel',
+                'Thintava Notifications',
+                importance: Importance.high,
+                priority: Priority.high,
+              ),
+            ),
+          );
+        }
       });
-      
-      // After a brief delay, continue with auth
-      Timer(const Duration(milliseconds: 1500), () {
-        setState(() {
-          _statusMessage = "Checking authentication...";
-        });
-      });
+      print('📱 Firebase messaging set up');
     } catch (e) {
-      print('❗ Error in order notification setup: $e');
-      setState(() {
-        _statusMessage = "Preparing app...";
-      });
+      print('❗ Error setting up Firebase messaging: $e');
     }
   }
 
   void _startListeningToAuth() {
-    print("👂 Listening to authStateChanges with order notification support...");
+    print("👂 Listening to authStateChanges...");
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) async {
-      if (!mounted) return;
+      if (!mounted || _hasNavigated) return;
 
       if (user == null) {
         print("🔴 No user. Navigating to /auth...");
-        setState(() {
-          _statusMessage = "Please sign in to continue...";
-        });
-        
-        // Clean up any existing order notifications
-        await NotificationService.cleanupNotifications();
-        
-        // Add a delay for splash screen effect
         await Future.delayed(const Duration(seconds: 2));
-        if (!mounted) return;
-        Navigator.pushReplacementNamed(context, '/auth');
+        if (!mounted || _hasNavigated) return;
+        _navigateToAuth();
         return;
       }
 
       print("🟢 User signed in: ${user.uid}");
       print("📧 User email: ${user.email}");
       
-      setState(() {
-        _statusMessage = "Setting up your notifications...";
-      });
+      // WAIT A BIT for session to be properly registered
+      print("⏳ Waiting for session to stabilize...");
+      await Future.delayed(const Duration(seconds: 2));
+      
+      if (!mounted || _hasNavigated) return;
+      
+      // Check session ONLY after giving time for registration
+      bool isActiveSession = await _authService.checkActiveSession();
+      if (!isActiveSession) {
+        print("❌ This device is not the active session for this user");
+        await _authService.logout();
+        
+        if (!mounted || _hasNavigated) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'You have been logged out because your account was logged in on another device',
+              style: GoogleFonts.poppins(),
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        
+        _navigateToAuth();
+        return;
+      }
 
-      // Setup order notifications for the authenticated user
-      await _setupUserOrderNotifications(user.uid);
+      // FCM Token handling
+      await _fetchAndSaveFcmToken(user.uid);
 
-      setState(() {
-        _statusMessage = "Loading your account...";
-      });
-
-      // Now fetch the user role
+      // Fetch user role
       final role = await _fetchUserRole(user.uid);
 
-      if (!mounted) return;
-      
-      setState(() {
-        _statusMessage = "Almost ready...";
-      });
+      if (!mounted || _hasNavigated) return;
       
       // Add a delay for splash screen effect
       await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
+      if (!mounted || _hasNavigated) return;
 
       print("🎯 User role: $role");
 
       // Navigate based on role
       if (role == 'admin') {
         print("🏠 Navigating to admin home");
-        Navigator.pushReplacementNamed(context, '/admin/home');
+        _navigateToRoute('/admin/home');
       } else if (role == 'kitchen') {
         print("👨‍🍳 Navigating to kitchen home");
-        Navigator.pushReplacementNamed(context, '/kitchen-menu');
+        _navigateToRoute('/kitchen-menu');
       } else {
         print("👤 Navigating to user home");
-        Navigator.pushReplacementNamed(context, '/user/user-home');
+        _navigateToRoute('/user/user-home');
       }
     }, onError: (error) {
       print("❗ Auth state change error: $error");
-      if (mounted) {
-        setState(() {
-          _statusMessage = "Authentication error. Please try again.";
-        });
-        Timer(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.pushReplacementNamed(context, '/auth');
-          }
-        });
+      if (mounted && !_hasNavigated) {
+        _navigateToAuth();
       }
     });
   }
 
-  Future<void> _setupUserOrderNotifications(String userId) async {
+  // Safe navigation methods to prevent multiple navigations
+  void _navigateToAuth() {
+    if (!_hasNavigated && mounted) {
+      _hasNavigated = true;
+      Navigator.pushReplacementNamed(context, '/auth');
+    }
+  }
+
+  void _navigateToRoute(String route) {
+    if (!_hasNavigated && mounted) {
+      _hasNavigated = true;
+      Navigator.pushReplacementNamed(context, route);
+    }
+  }
+
+  Future<void> _fetchAndSaveFcmToken(String userId) async {
     try {
-      print("🔔 Setting up order notifications for user: $userId");
-      
-      // Get user role to determine notification preferences
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
-      final userData = userDoc.data();
-      final userRole = userData?['role'] ?? 'user';
-      
-      // Get FCM token for order notifications
+      print("🚀 Fetching FCM token for user: $userId");
       String? token;
       int retries = 0;
 
-      while (token == null && retries < 3) {
+      while (token == null && retries < 5) {
         try {
           token = await FirebaseMessaging.instance.getToken();
           if (token == null) {
@@ -184,44 +222,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       }
 
       if (token != null) {
-        print("✅ Got FCM token for order notifications: ${token.substring(0, 20)}...");
-        
-        // Save token with order notification preferences
-        Map<String, dynamic> notificationPrefs = {
-          'orderUpdates': true,
-          'promotions': false, // Explicitly disabled
-          'marketing': false,  // Explicitly disabled
-        };
-        
-        // Add role-specific notification preferences
-        if (userRole == 'kitchen') {
-          notificationPrefs['newOrderAlerts'] = true;
-        } else if (userRole == 'user') {
-          notificationPrefs['orderExpiring'] = true;
-        }
-        
+        print("✅ Got FCM token: ${token.substring(0, 20)}...");
         try {
           await FirebaseFirestore.instance.collection('users').doc(userId).set(
             {
               'fcmToken': token,
-              'notificationPreferences': notificationPrefs,
               'lastTokenUpdate': FieldValue.serverTimestamp(),
-              'deviceInfo': {
-                'platform': 'flutter',
-                'notificationChannels': ['thintava_orders', 'thintava_urgent'],
-              }
             },
             SetOptions(merge: true),
           );
-          print("💾 Order notification preferences saved to Firestore");
+          print("💾 FCM token saved to Firestore");
         } catch (e) {
-          print("❗ Error saving notification preferences: $e");
+          print("❗ Error saving FCM token to Firestore: $e");
         }
 
-        // Set up token refresh listener for order notifications
         _tokenRefreshSubscription?.cancel();
         _tokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-          print("🔄 FCM token refreshed for order notifications: ${newToken.substring(0, 20)}...");
+          print("🔄 FCM token refreshed: ${newToken.substring(0, 20)}...");
           try {
             await FirebaseFirestore.instance.collection('users').doc(userId).set(
               {
@@ -230,26 +247,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               },
               SetOptions(merge: true),
             );
-            print("💾 Refreshed FCM token saved for order notifications");
+            print("💾 Refreshed FCM token saved to Firestore");
           } catch (e) {
             print("❗ Error saving refreshed FCM token: $e");
           }
         });
-        
-        setState(() {
-          _statusMessage = "Order notifications activated!";
-        });
       } else {
         print("❗ Could not get FCM token after $retries attempts");
-        setState(() {
-          _statusMessage = "Notifications unavailable, continuing...";
-        });
       }
     } catch (e) {
-      print("❗ Error in _setupUserOrderNotifications: $e");
-      setState(() {
-        _statusMessage = "Notification setup failed, continuing...";
-      });
+      print("❗ Error in _fetchAndSaveFcmToken: $e");
     }
   }
 
@@ -262,24 +269,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         final data = doc.data()!;
         final role = data['role'] ?? 'user';
         print("📋 User role found: $role");
-        print("📋 User data: ${data.keys.toList()}");
         return role;
       } else {
         print("📋 No user document found, defaulting to 'user'");
-        // Create user document with default role and notification preferences
         try {
           await FirebaseFirestore.instance.collection('users').doc(userId).set({
             'role': 'user',
             'email': FirebaseAuth.instance.currentUser?.email,
             'createdAt': FieldValue.serverTimestamp(),
-            'notificationPreferences': {
-              'orderUpdates': true,
-              'orderExpiring': true,
-              'promotions': false,
-              'marketing': false,
-            }
           }, SetOptions(merge: true));
-          print("📋 Created default user document with order notification preferences");
+          print("📋 Created default user document");
         } catch (e) {
           print("❗ Error creating user document: $e");
         }
@@ -293,10 +292,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
-    print("🗑️ Disposing enhanced splash screen");
+    print("🗑️ Disposing splash screen");
     _authSubscription.cancel();
     _tokenRefreshSubscription?.cancel();
     _animationController.dispose();
+    _authService.stopSessionListener();
     super.dispose();
   }
 
@@ -317,7 +317,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo Container with shadow effect
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -348,71 +347,29 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Random food quote from our list
-                Text(
-                  foodQuotes[DateTime.now().second % foodQuotes.length],
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.white.withOpacity(0.8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    foodQuotes[DateTime.now().second % foodQuotes.length],
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.white.withOpacity(0.8),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 40),
-                // Order notification indicator
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.notifications_active,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Order Notifications Enabled",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
                 const CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   strokeWidth: 3,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _statusMessage,
+                  "Preparing your experience...",
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 16,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 40),
-                // Notification disclaimer
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    "We'll send you notifications only about your orders - no promotions or spam!",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
                   ),
                 ),
               ],

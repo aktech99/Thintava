@@ -1,4 +1,4 @@
-// lib/services/auth_service.dart
+// lib/services/auth_service.dart - FIXED VERSION
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -10,9 +10,15 @@ class AuthService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final SessionManager _sessionManager = SessionManager();
 
+  // Flag to prevent session check during login process
+  bool _isLoggingIn = false;
+
   // Register User
   Future<User?> register(String email, String password, String role) async {
     try {
+      _isLoggingIn = true;
+      print('🔄 Starting registration process...');
+      
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email, 
         password: password
@@ -20,46 +26,38 @@ class AuthService {
       User? user = result.user;
 
       if (user != null) {
-        // Save role in Firestore
+        print('✅ Firebase Auth registration successful');
+        
+        // Save role in Firestore FIRST
         await _db.collection('users').doc(user.uid).set({
           'email': email,
           'role': role,
           'createdAt': FieldValue.serverTimestamp(),
         });
+        print('✅ User document created');
 
-        // TEMPORARILY COMMENT OUT SESSION MANAGEMENT
-        // await _sessionManager.registerSession(user);
+        // Then register session
+        await _sessionManager.registerSession(user);
+        print('✅ Session registered');
         
-        // Update FCM token with better error handling
+        // Update FCM token
         await _updateFCMTokenSafely(user.uid, isRegistration: true);
+        print('✅ FCM token updated');
       }
 
+      _isLoggingIn = false;
       return user;
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'weak-password':
-          errorMessage = 'The password provided is too weak.';
-          break;
-        case 'email-already-in-use':
-          errorMessage = 'The account already exists for that email.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is not valid.';
-          break;
-        default:
-          errorMessage = e.message ?? 'An unknown error occurred';
-      }
-      throw Exception(errorMessage);
     } catch (e) {
+      _isLoggingIn = false;
       print('❌ Registration error: $e');
-      throw Exception('Registration failed: ${e.toString()}');
+      rethrow;
     }
   }
 
-  // Login User
+  // Login User - FIXED
   Future<User?> login(String email, String password) async {
     try {
+      _isLoggingIn = true;
       print('🔑 Starting login process for: $email');
       
       UserCredential result = await _auth.signInWithEmailAndPassword(
@@ -71,63 +69,29 @@ class AuthService {
       if (user != null) {
         print('✅ Firebase Auth successful for: ${user.email}');
         
-        // TEMPORARILY COMMENT OUT SESSION MANAGEMENT
-        // await _sessionManager.registerSession(user);
+        // Register session IMMEDIATELY after successful auth
+        await _sessionManager.registerSession(user);
+        print('✅ Session registered successfully');
         
-        // Update FCM token with better error handling
+        // Update FCM token
         await _updateFCMTokenSafely(user.uid, isLogin: true);
+        print('✅ FCM token updated');
         
         print('✅ Login completed successfully');
       }
       
+      _isLoggingIn = false;
       return user;
-    } on FirebaseAuthException catch (e) {
-      print('❌ FirebaseAuthException: ${e.code} - ${e.message}');
-      String errorMessage;
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No user found for that email.';
-          break;
-        case 'wrong-password':
-          errorMessage = 'Wrong password provided.';
-          break;
-        case 'invalid-email':
-          errorMessage = 'The email address is not valid.';
-          break;
-        case 'user-disabled':
-          errorMessage = 'This user account has been disabled.';
-          break;
-        case 'too-many-requests':
-          errorMessage = 'Too many failed login attempts. Please try again later.';
-          break;
-        case 'invalid-credential':
-          errorMessage = 'Invalid email or password.';
-          break;
-        default:
-          errorMessage = e.message ?? 'Login failed';
-      }
-      throw Exception(errorMessage);
     } catch (e) {
+      _isLoggingIn = false;
       print('❌ Login error: $e');
-      // Check if this is the FCM token error
-      if (e.toString().contains('PigeonUserDetails') || 
-          e.toString().contains('List<Object?>')) {
-        print('⚠️ FCM Token error detected, proceeding without token update');
-        // Try to get the user without FCM token operations
-        final user = _auth.currentUser;
-        if (user != null) {
-          print('✅ Login successful despite FCM error');
-          return user;
-        }
-      }
-      throw Exception('Login failed: ${e.toString()}');
+      rethrow;
     }
   }
 
   // Safe FCM Token update method
   Future<void> _updateFCMTokenSafely(String uid, {bool isRegistration = false, bool isLogin = false}) async {
     try {
-      // Add a small delay to ensure Firebase is fully initialized
       await Future.delayed(const Duration(milliseconds: 100));
       
       String? token = await FirebaseMessaging.instance.getToken();
@@ -159,8 +123,11 @@ class AuthService {
   // Logout
   Future<void> logout() async {
     try {
-      // TEMPORARILY COMMENT OUT SESSION MANAGEMENT
-      // await _sessionManager.clearSession();
+      print('🔄 Starting logout process...');
+      
+      // Clear session first to update history
+      await _sessionManager.clearSession();
+      print('✅ Session cleared');
       
       // Remove FCM token before signing out
       User? user = _auth.currentUser;
@@ -192,41 +159,43 @@ class AuthService {
         'lastLogoutTime': FieldValue.serverTimestamp(),
       });
       
-      // Delete the FCM token from Firebase Messaging
       await FirebaseMessaging.instance.deleteToken();
       print('✅ FCM token cleared successfully');
     } catch (e) {
       print('❌ Error clearing FCM token: $e');
-      // Continue with logout even if token cleanup fails
     }
   }
 
-  // Check if this device is still the active session
+  // Check if this device is still the active session - FIXED
   Future<bool> checkActiveSession() async {
-    // TEMPORARILY RETURN TRUE TO DISABLE SESSION CHECKS
-    return true;
-    
-    // COMMENT OUT THE ACTUAL SESSION CHECK FOR NOW
-    // try {
-    //   return await _sessionManager.isActiveSession();
-    // } catch (e) {
-    //   print('Error checking active session: $e');
-    //   return false;
-    // }
+    try {
+      // SKIP session check during login process
+      if (_isLoggingIn) {
+        print('⏳ Skipping session check - login in progress');
+        return true;
+      }
+
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('❌ No current user for session check');
+        return false;
+      }
+
+      return await _sessionManager.isActiveSession();
+    } catch (e) {
+      print('Error checking active session: $e');
+      return true; // Default to true to avoid blocking user during errors
+    }
   }
   
   // Start listening for session changes
   void startSessionListener(VoidCallback onForcedLogout) {
-    // TEMPORARILY DISABLE SESSION LISTENER
-    // _sessionManager.startSessionListener(onForcedLogout);
-    print('📱 Session listener temporarily disabled');
+    _sessionManager.startSessionListener(onForcedLogout);
   }
   
   // Stop listening for session changes
   void stopSessionListener() {
-    // TEMPORARILY DISABLE SESSION LISTENER
-    // _sessionManager.stopSessionListener();
-    print('🛑 Session listener stop temporarily disabled');
+    _sessionManager.stopSessionListener();
   }
 
   // Get current user
@@ -277,7 +246,6 @@ class AuthService {
         await user.updateDisplayName(displayName);
         await user.updatePhotoURL(photoURL);
         
-        // Also update in Firestore
         await _db.collection('users').doc(user.uid).update({
           'displayName': displayName,
           'photoURL': photoURL,
@@ -339,12 +307,9 @@ class AuthService {
     try {
       final user = _auth.currentUser;
       if (user != null) {
-        // Delete user data from Firestore
+        await _sessionManager.clearSession();
         await _db.collection('users').doc(user.uid).delete();
-        
-        // Delete the user account
         await user.delete();
-        
         print('✅ User account deleted successfully');
       }
     } on FirebaseAuthException catch (e) {

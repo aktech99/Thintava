@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:canteen_app/screens/kitchen/kitchen_dashboard.dart';
 import 'package:canteen_app/services/auth_service.dart';
-import 'package:canteen_app/widgets/session_checker.dart'; // Import SessionChecker
+import 'package:canteen_app/widgets/session_checker.dart';
 
 class KitchenHome extends StatefulWidget {
   const KitchenHome({Key? key}) : super(key: key);
