@@ -1,4 +1,4 @@
-// lib/screens/splash/splash_screen.dart - FIXED VERSION
+// lib/screens/splash/splash_screen.dart - IMPROVED VERSION
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,45 +22,16 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   final AuthService _authService = AuthService();
-  bool _hasNavigated = false; // Prevent multiple navigations
+  bool _hasNavigated = false;
+  bool _isProcessingAuth = false;
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
     _setupFirebaseMessaging();
-    _startListeningToAuth();
-    
-    // Start session listener for forced logout detection
-    _authService.startSessionListener(() {
-      _handleForcedLogout();
-    });
+    _startAuthListener();
     print('🎬 Splash screen initialized');
-  }
-  
-  void _handleForcedLogout() {
-    if (mounted && !_hasNavigated) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: Text('Logged Out', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-          content: Text(
-            'You have been logged out because your account was logged in on another device.',
-            style: GoogleFonts.poppins(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _navigateToAuth();
-              },
-              child: Text('OK', style: GoogleFonts.poppins()),
-            ),
-          ],
-        ),
-      );
-    }
   }
 
   void _setupAnimations() {
@@ -105,87 +76,152 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       });
       print('📱 Firebase messaging set up');
     } catch (e) {
-      print('❗ Error setting up Firebase messaging: $e');
+      print('⚠️ Error setting up Firebase messaging: $e');
     }
   }
 
-  void _startListeningToAuth() {
-    print("👂 Listening to authStateChanges...");
+  void _startAuthListener() {
+    print("👂 Starting auth state listener...");
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) async {
-      if (!mounted || _hasNavigated) return;
+      if (!mounted || _hasNavigated || _isProcessingAuth) return;
 
-      if (user == null) {
-        print("🔴 No user. Navigating to /auth...");
-        await Future.delayed(const Duration(seconds: 2));
-        if (!mounted || _hasNavigated) return;
-        _navigateToAuth();
-        return;
-      }
+      _isProcessingAuth = true;
+      print("📱 Auth state changed, user: ${user?.uid ?? 'null'}");
 
-      print("🟢 User signed in: ${user.uid}");
-      print("📧 User email: ${user.email}");
-      
-      // WAIT A BIT for session to be properly registered
-      print("⏳ Waiting for session to stabilize...");
-      await Future.delayed(const Duration(seconds: 2));
-      
-      if (!mounted || _hasNavigated) return;
-      
-      // Check session ONLY after giving time for registration
-      bool isActiveSession = await _authService.checkActiveSession();
-      if (!isActiveSession) {
-        print("❌ This device is not the active session for this user");
-        await _authService.logout();
+      try {
+        if (user == null) {
+          print("🔴 No user found, navigating to auth...");
+          await _delayedNavigation(2000);
+          _navigateToAuth();
+          return;
+        }
+
+        print("🟢 User found: ${user.uid}");
+        print("📧 User email: ${user.email}");
+        
+        // Wait longer for session registration to complete
+        print("⏳ Waiting for session to stabilize...");
+        await Future.delayed(const Duration(seconds: 3));
         
         if (!mounted || _hasNavigated) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'You have been logged out because your account was logged in on another device',
-              style: GoogleFonts.poppins(),
-            ),
-            duration: const Duration(seconds: 5),
-          ),
-        );
         
-        _navigateToAuth();
-        return;
-      }
+        // Check session status with retry logic
+        bool isActiveSession = false;
+        int sessionCheckRetries = 0;
+        const maxSessionRetries = 3;
+        
+        while (!isActiveSession && sessionCheckRetries < maxSessionRetries) {
+          try {
+            isActiveSession = await _authService.checkActiveSession()
+                .timeout(const Duration(seconds: 10));
+            
+            if (!isActiveSession) {
+              sessionCheckRetries++;
+              print("❌ Session check failed, retry $sessionCheckRetries/$maxSessionRetries");
+              
+              if (sessionCheckRetries < maxSessionRetries) {
+                await Future.delayed(Duration(seconds: sessionCheckRetries));
+              }
+            } else {
+              print("✅ Session is active");
+            }
+          } catch (sessionError) {
+            sessionCheckRetries++;
+            print("❌ Session check error (attempt $sessionCheckRetries): $sessionError");
+            
+            if (sessionCheckRetries >= maxSessionRetries) {
+              print("⚠️ Session check failed after $maxSessionRetries attempts, continuing anyway");
+              isActiveSession = true; // Allow login to proceed
+            } else {
+              await Future.delayed(Duration(seconds: sessionCheckRetries));
+            }
+          }
+        }
+        
+        if (!isActiveSession) {
+          print("❌ Device session is not active, logging out");
+          await _authService.logout();
+          
+          if (!mounted || _hasNavigated) return;
+          _showSessionExpiredMessage();
+          _navigateToAuth();
+          return;
+        }
 
-      // FCM Token handling
-      await _fetchAndSaveFcmToken(user.uid);
+        // Handle FCM token
+        await _setupFCMToken(user.uid);
 
-      // Fetch user role
-      final role = await _fetchUserRole(user.uid);
+        // Fetch user role with retry logic
+        String role = await _fetchUserRoleWithRetry(user.uid);
 
-      if (!mounted || _hasNavigated) return;
-      
-      // Add a delay for splash screen effect
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted || _hasNavigated) return;
+        if (!mounted || _hasNavigated) return;
+        
+        // Add delay for better UX
+        await _delayedNavigation(1000);
 
-      print("🎯 User role: $role");
+        print("🎯 User role: $role");
 
-      // Navigate based on role
-      if (role == 'admin') {
-        print("🏠 Navigating to admin home");
-        _navigateToRoute('/admin/home');
-      } else if (role == 'kitchen') {
-        print("👨‍🍳 Navigating to kitchen home");
-        _navigateToRoute('/kitchen-menu');
-      } else {
-        print("👤 Navigating to user home");
-        _navigateToRoute('/user/user-home');
+        // Navigate based on role
+        switch (role) {
+          case 'admin':
+            print("🏠 Navigating to admin home");
+            _navigateToRoute('/admin/home');
+            break;
+          case 'kitchen':
+            print("👨‍🍳 Navigating to kitchen home");
+            _navigateToRoute('/kitchen-menu');
+            break;
+          default:
+            print("👤 Navigating to user home");
+            _navigateToRoute('/user/user-home');
+        }
+
+      } catch (e) {
+        print("❌ Error in auth listener: $e");
+        if (mounted && !_hasNavigated) {
+          _navigateToAuth();
+        }
+      } finally {
+        _isProcessingAuth = false;
       }
     }, onError: (error) {
-      print("❗ Auth state change error: $error");
+      print("❌ Auth state change error: $error");
+      _isProcessingAuth = false;
       if (mounted && !_hasNavigated) {
         _navigateToAuth();
       }
     });
   }
 
-  // Safe navigation methods to prevent multiple navigations
+  Future<void> _delayedNavigation(int milliseconds) async {
+    await Future.delayed(Duration(milliseconds: milliseconds));
+  }
+
+  void _showSessionExpiredMessage() {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.warning, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Your account was logged in on another device',
+                  style: GoogleFonts.poppins(),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  // Safe navigation methods
   void _navigateToAuth() {
     if (!_hasNavigated && mounted) {
       _hasNavigated = true;
@@ -200,29 +236,32 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _fetchAndSaveFcmToken(String userId) async {
+  Future<void> _setupFCMToken(String userId) async {
     try {
-      print("🚀 Fetching FCM token for user: $userId");
+      print("🚀 Setting up FCM token for user: $userId");
       String? token;
       int retries = 0;
+      const maxRetries = 3;
 
-      while (token == null && retries < 5) {
+      while (token == null && retries < maxRetries) {
         try {
-          token = await FirebaseMessaging.instance.getToken();
-          if (token == null) {
-            print("⏳ FCM token not ready, retrying... attempt ${retries + 1}");
-            await Future.delayed(const Duration(seconds: 1));
-            retries++;
+          token = await FirebaseMessaging.instance.getToken()
+              .timeout(const Duration(seconds: 5));
+          
+          if (token != null) {
+            print("✅ FCM token obtained: ${token.substring(0, 20)}...");
+            break;
           }
         } catch (e) {
-          print("❗ Error getting FCM token on attempt ${retries + 1}: $e");
           retries++;
-          await Future.delayed(const Duration(seconds: 1));
+          print("⚠️ FCM token attempt $retries failed: $e");
+          if (retries < maxRetries) {
+            await Future.delayed(Duration(seconds: retries));
+          }
         }
       }
 
       if (token != null) {
-        print("✅ Got FCM token: ${token.substring(0, 20)}...");
         try {
           await FirebaseFirestore.instance.collection('users').doc(userId).set(
             {
@@ -230,15 +269,17 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               'lastTokenUpdate': FieldValue.serverTimestamp(),
             },
             SetOptions(merge: true),
-          );
+          ).timeout(const Duration(seconds: 10));
+          
           print("💾 FCM token saved to Firestore");
         } catch (e) {
-          print("❗ Error saving FCM token to Firestore: $e");
+          print("⚠️ Error saving FCM token: $e");
         }
 
+        // Set up token refresh listener
         _tokenRefreshSubscription?.cancel();
         _tokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-          print("🔄 FCM token refreshed: ${newToken.substring(0, 20)}...");
+          print("🔄 FCM token refreshed");
           try {
             await FirebaseFirestore.instance.collection('users').doc(userId).set(
               {
@@ -247,47 +288,66 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               },
               SetOptions(merge: true),
             );
-            print("💾 Refreshed FCM token saved to Firestore");
           } catch (e) {
-            print("❗ Error saving refreshed FCM token: $e");
+            print("⚠️ Error saving refreshed FCM token: $e");
           }
         });
       } else {
-        print("❗ Could not get FCM token after $retries attempts");
+        print("⚠️ Could not get FCM token after $maxRetries attempts");
       }
     } catch (e) {
-      print("❗ Error in _fetchAndSaveFcmToken: $e");
+      print("❌ Error in FCM setup: $e");
     }
   }
 
-  Future<String> _fetchUserRole(String userId) async {
-    try {
-      print("🔍 Fetching user role for: $userId");
-      final doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
-      
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        final role = data['role'] ?? 'user';
-        print("📋 User role found: $role");
-        return role;
-      } else {
-        print("📋 No user document found, defaulting to 'user'");
-        try {
-          await FirebaseFirestore.instance.collection('users').doc(userId).set({
-            'role': 'user',
-            'email': FirebaseAuth.instance.currentUser?.email,
-            'createdAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          print("📋 Created default user document");
-        } catch (e) {
-          print("❗ Error creating user document: $e");
+  Future<String> _fetchUserRoleWithRetry(String userId) async {
+    int retries = 0;
+    const maxRetries = 3;
+    
+    while (retries < maxRetries) {
+      try {
+        print("🔍 Fetching user role (attempt ${retries + 1})...");
+        
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get()
+            .timeout(const Duration(seconds: 10));
+        
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          final role = data['role'] ?? 'user';
+          print("📋 User role found: $role");
+          return role;
+        } else {
+          print("📋 No user document found, creating default...");
+          try {
+            await FirebaseFirestore.instance.collection('users').doc(userId).set({
+              'role': 'user',
+              'email': FirebaseAuth.instance.currentUser?.email,
+              'createdAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            print("📋 Created default user document");
+            return 'user';
+          } catch (e) {
+            print("❌ Error creating user document: $e");
+            return 'user';
+          }
         }
-        return 'user';
+      } catch (e) {
+        retries++;
+        print("❌ Error fetching role (attempt $retries): $e");
+        
+        if (retries < maxRetries) {
+          await Future.delayed(Duration(seconds: retries));
+        } else {
+          print("❌ Failed to fetch role after $maxRetries attempts, defaulting to 'user'");
+          return 'user';
+        }
       }
-    } catch (e) {
-      print("❗ Error fetching role: $e");
-      return 'user';
     }
+    
+    return 'user';
   }
 
   @override
@@ -296,7 +356,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _authSubscription.cancel();
     _tokenRefreshSubscription?.cancel();
     _animationController.dispose();
-    _authService.stopSessionListener();
     super.dispose();
   }
 
@@ -366,7 +425,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "Preparing your experience...",
+                  _isProcessingAuth 
+                    ? "Verifying your session..." 
+                    : "Preparing your experience...",
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 16,

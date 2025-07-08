@@ -56,10 +56,11 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = _parseErrorMessage(e.toString());
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Register Failed: $e',
+              errorMessage,
               style: GoogleFonts.poppins(),
             ),
             backgroundColor: Colors.redAccent,
@@ -74,6 +75,26 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         });
       }
     }
+  }
+
+  String _parseErrorMessage(String error) {
+    // Handle Firebase Auth errors
+    if (error.contains('email-already-in-use')) {
+      return 'An account already exists with this email';
+    } else if (error.contains('invalid-email')) {
+      return 'Please enter a valid email address';
+    } else if (error.contains('weak-password')) {
+      return 'Password should be at least 6 characters';
+    } else if (error.contains('operation-not-allowed')) {
+      return 'Email/password accounts are not enabled';
+    } else if (error.contains('Exception: ')) {
+      // Extract the exception message
+      final match = RegExp(r'Exception: (.+)').firstMatch(error);
+      if (match != null) {
+        return match.group(1) ?? 'Registration failed. Please try again';
+      }
+    }
+    return 'Registration failed. Please try again';
   }
 
   @override

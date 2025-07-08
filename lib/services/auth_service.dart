@@ -1,9 +1,11 @@
-// lib/services/auth_service.dart - FIXED VERSION
+// lib/services/auth_service.dart - COMPLETE FIXED VERSION
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:canteen_app/services/session_manager.dart';
+import 'package:canteen_app/services/firebase_auth_wrapper.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -13,17 +15,20 @@ class AuthService {
   // Flag to prevent session check during login process
   bool _isLoggingIn = false;
 
-  // Register User
+  // Register User - FIXED with wrapper
   Future<User?> register(String email, String password, String role) async {
     try {
       _isLoggingIn = true;
       print('🔄 Starting registration process...');
       
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email, 
-        password: password
+      // Use the wrapper with retry logic
+      final result = await FirebaseAuthWrapper.createUserWithRetry(
+        email: email,
+        password: password,
+        maxRetries: 3,
       );
-      User? user = result.user;
+      
+      final user = result?.user;
 
       if (user != null) {
         print('✅ Firebase Auth registration successful');
@@ -50,21 +55,41 @@ class AuthService {
     } catch (e) {
       _isLoggingIn = false;
       print('❌ Registration error: $e');
+      
+      // Provide better error messages
+      if (e is FirebaseAuthException) {
+        switch (e.code) {
+          case 'email-already-in-use':
+            throw Exception('An account already exists with this email.');
+          case 'invalid-email':
+            throw Exception('Please enter a valid email address.');
+          case 'operation-not-allowed':
+            throw Exception('Email/password accounts are not enabled.');
+          case 'weak-password':
+            throw Exception('Password should be at least 6 characters.');
+          default:
+            throw Exception(e.message ?? 'Registration failed. Please try again.');
+        }
+      }
+      
       rethrow;
     }
   }
 
-  // Login User - FIXED
+  // Login User - FIXED with wrapper
   Future<User?> login(String email, String password) async {
     try {
       _isLoggingIn = true;
       print('🔑 Starting login process for: $email');
       
-      UserCredential result = await _auth.signInWithEmailAndPassword(
-        email: email, 
-        password: password
+      // Use the wrapper with retry logic
+      final result = await FirebaseAuthWrapper.signInWithRetry(
+        email: email,
+        password: password,
+        maxRetries: 3,
       );
-      User? user = result.user;
+      
+      final user = result?.user;
       
       if (user != null) {
         print('✅ Firebase Auth successful for: ${user.email}');
@@ -85,6 +110,28 @@ class AuthService {
     } catch (e) {
       _isLoggingIn = false;
       print('❌ Login error: $e');
+      
+      // Provide better error messages
+      if (e is FirebaseAuthException) {
+        switch (e.code) {
+          case 'user-not-found':
+            throw Exception('No account found with this email address.');
+          case 'wrong-password':
+          case 'invalid-credential':
+            throw Exception('Incorrect password. Please try again.');
+          case 'invalid-email':
+            throw Exception('Please enter a valid email address.');
+          case 'user-disabled':
+            throw Exception('This account has been disabled.');
+          case 'too-many-requests':
+            throw Exception('Too many failed attempts. Please try again later.');
+          case 'network-request-failed':
+            throw Exception('Network error. Please check your internet connection.');
+          default:
+            throw Exception(e.message ?? 'Login failed. Please try again.');
+        }
+      }
+      
       rethrow;
     }
   }
@@ -135,14 +182,14 @@ class AuthService {
         await _clearFCMTokenSafely(user.uid);
       }
       
-      // Sign out from Firebase Auth
-      await _auth.signOut();
+      // Sign out from Firebase Auth using wrapper
+      await FirebaseAuthWrapper.signOut();
       print('✅ User logged out successfully');
     } catch (e) {
       print('❌ Error during logout: $e');
       // Still attempt to sign out even if other operations fail
       try {
-        await _auth.signOut();
+        await FirebaseAuthWrapper.signOut();
         print('✅ Force sign out successful');
       } catch (signOutError) {
         print('❌ Error signing out: $signOutError');
@@ -199,7 +246,7 @@ class AuthService {
   }
 
   // Get current user
-  User? get currentUser => _auth.currentUser;
+  User? get currentUser => FirebaseAuthWrapper.currentUser;
 
   // Get user role from Firestore
   Future<String?> getUserRole(String uid) async {
@@ -227,21 +274,21 @@ class AuthService {
   }
 
   // Check if user is logged in
-  bool get isLoggedIn => _auth.currentUser != null;
+  bool get isLoggedIn => FirebaseAuthWrapper.currentUser != null;
 
   // Get current user's email
-  String? get currentUserEmail => _auth.currentUser?.email;
+  String? get currentUserEmail => FirebaseAuthWrapper.currentUser?.email;
 
   // Get current user's UID
-  String? get currentUserUid => _auth.currentUser?.uid;
+  String? get currentUserUid => FirebaseAuthWrapper.currentUser?.uid;
 
   // Stream of auth state changes
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  Stream<User?> get authStateChanges => FirebaseAuthWrapper.authStateChanges();
 
   // Update user profile
   Future<void> updateUserProfile({String? displayName, String? photoURL}) async {
     try {
-      final user = _auth.currentUser;
+      final user = FirebaseAuthWrapper.currentUser;
       if (user != null) {
         await user.updateDisplayName(displayName);
         await user.updatePhotoURL(photoURL);
@@ -283,7 +330,7 @@ class AuthService {
   // Verify email
   Future<void> sendEmailVerification() async {
     try {
-      final user = _auth.currentUser;
+      final user = FirebaseAuthWrapper.currentUser;
       if (user != null && !user.emailVerified) {
         await user.sendEmailVerification();
       }
@@ -296,7 +343,7 @@ class AuthService {
   // Reload user data
   Future<void> reloadUser() async {
     try {
-      await _auth.currentUser?.reload();
+      await FirebaseAuthWrapper.currentUser?.reload();
     } catch (e) {
       print('Error reloading user: $e');
     }
@@ -305,7 +352,7 @@ class AuthService {
   // Delete user account
   Future<void> deleteAccount() async {
     try {
-      final user = _auth.currentUser;
+      final user = FirebaseAuthWrapper.currentUser;
       if (user != null) {
         await _sessionManager.clearSession();
         await _db.collection('users').doc(user.uid).delete();

@@ -116,9 +116,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       return 'Network error. Please check your connection';
     } else if (error.contains('PigeonUserDetails') || error.contains('List<Object?>')) {
       return 'Authentication error. Please try again';
-    } else {
-      return 'Login failed. Please try again';
+    } else if (error.contains('Exception: ')) {
+      // Extract the exception message
+      final match = RegExp(r'Exception: (.+)').firstMatch(error);
+      if (match != null) {
+        return match.group(1) ?? 'Login failed. Please try again';
+      }
     }
+    return 'Login failed. Please try again';
   }
 
   void _showError(String message) {
