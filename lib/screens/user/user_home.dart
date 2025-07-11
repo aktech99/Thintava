@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canteen_app/services/auth_service.dart';
 import 'package:canteen_app/widgets/session_checker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:canteen_app/providers/cart_provider.dart';
 
 class UserHome extends StatefulWidget {
   const UserHome({Key? key}) : super(key: key);
@@ -18,6 +21,8 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   final _authService = AuthService();
+  final searchController = TextEditingController();
+  String filterOption = "All";
   
   Map<String, dynamic>? _userData;
   bool _isLoadingUserData = true;
@@ -35,12 +40,10 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
       vsync: this,
     )..repeat(reverse: true);
 
-    // Overall fade-in animation for the content
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
     );
 
-    // Pulse animation for interactive elements
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -48,7 +51,6 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
     _fadeController.forward();
     _loadUserData();
     
-    // Start listening for session changes
     _authService.startSessionListener(() {
       logout(context, forceLogout: true);
     });
@@ -124,13 +126,15 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
   void dispose() {
     _fadeController.dispose();
     _pulseController.dispose();
+    searchController.dispose();
     _authService.stopSessionListener();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Wrap the main UI in a SessionChecker
+    final menuStream = FirebaseFirestore.instance.collection('menuItems').snapshots();
+
     return SessionChecker(
       authService: _authService,
       child: Scaffold(
@@ -147,20 +151,46 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications_active_outlined),
-              tooltip: "Notifications",
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('No new notifications!', 
-                      style: GoogleFonts.poppins(),
+              icon: const Icon(Icons.track_changes),
+              tooltip: "Track Order",
+              onPressed: () => Navigator.pushNamed(context, '/track'),
+            ),
+            Consumer<CartProvider>(
+              builder: (context, cartProvider, child) {
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.shopping_cart),
+                      tooltip: "Cart",
+                      onPressed: () => Navigator.pushNamed(context, '/cart'),
                     ),
-                    backgroundColor: Colors.black87,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
+                    if (cartProvider.itemCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFB703),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 14,
+                            minHeight: 14,
+                          ),
+                          child: Text(
+                            '${cartProvider.itemCount}',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               },
             ),
@@ -175,7 +205,7 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFFFFB703), // The requested amber color
+                const Color(0xFFFFB703),
                 const Color(0xFFFFB703).withOpacity(0.85),
                 const Color(0xFFFDC85D),
               ],
@@ -186,27 +216,26 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
           child: SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    
-                    // User greeting with username or phone
-                    _isLoadingUserData
-                      ? Container(
-                          height: 60,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User greeting and search bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        _isLoadingUserData
+                          ? Container(
+                              height:40,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                            )
+                          : Text(
                               "Hello, ${_getUserDisplayName()}!",
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
@@ -214,100 +243,398 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
                                 color: const Color(0xFF023047),
                               ),
                             ),
-                            if (_userData?['phoneNumber'] != null)
-                              Text(
-                                _userData!['phoneNumber'],
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: const Color(0xFF023047).withOpacity(0.7),
+                        const SizedBox(height: 16),
+                        
+                        // Search and filter row
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: searchController,
+                                  decoration: InputDecoration(
+                                    hintText: "Search food items",
+                                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.grey[100],
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {});
+                                  },
                                 ),
                               ),
-                          ],
+                              const SizedBox(width: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.shade300),
+                                ),
+                                child: PopupMenuButton<String>(
+                                  icon: const Icon(Icons.filter_list, color: Color(0xFF023047)),
+                                  tooltip: "Filter",
+                                  onSelected: (String value) {
+                                    setState(() {
+                                      filterOption = value;
+                                    });
+                                  },
+                                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                                    const PopupMenuItem<String>(
+                                      value: 'All',
+                                      child: Text('All Items'),
+                                    ),
+                                    const PopupMenuItem<String>(
+                                      value: 'Veg',
+                                      child: Text('Vegetarian Only'),
+                                    ),
+                                    const PopupMenuItem<String>(
+                                      value: 'Non Veg',
+                                      child: Text('Non-Vegetarian'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                    
-                    const SizedBox(height: 8),
-                    Text(
-                      "What would you like today?",
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        color: const Color(0xFF023047).withOpacity(0.8),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    
-                    // Food categories horizontal scrollable list
-                    SizedBox(
-                      height: 100,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _buildCategoryItem(Icons.local_pizza, "Pizza"),
-                          _buildCategoryItem(Icons.lunch_dining, "Burgers"),
-                          _buildCategoryItem(Icons.ramen_dining, "Noodles"),
-                          _buildCategoryItem(Icons.icecream, "Desserts"),
-                          _buildCategoryItem(Icons.local_drink, "Drinks"),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    Text(
-                      "Quick Actions",
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF023047),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Flexible(
-                      child: GridView.count(
-                        crossAxisCount: 2,
-                        childAspectRatio: 1.1,
-                        crossAxisSpacing: 15,
-                        mainAxisSpacing: 15,
-                        shrinkWrap: true,
-                        physics: const ScrollPhysics(),
-                        children: [
-                          _buildActionCard(
-                            context,
-                            Icons.restaurant_menu,
-                            "Browse Menu",
-                            "Explore our delicious options",
-                            () => Navigator.pushNamed(context, '/menu'),
-                            Colors.orangeAccent,
+                  ),
+
+                  // Filter indicator
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        Text(
+                          "Filter: ",
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.bold,
                           ),
-                          _buildActionCard(
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF023047),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            filterOption,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Menu items list
+                  Expanded(
+                    child: StreamBuilder(
+                      stream: menuStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFFFB703),
+                            ),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Center(child: Text("No items available"));
+                        }
+
+                        final items = snapshot.data!.docs;
+                        
+                        // Filter items based on search text and veg/non-veg filter
+                        final filteredItems = items.where((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final name = (data['name'] ?? "").toString().toLowerCase();
+                          final searchText = searchController.text.toLowerCase();
+                          bool matchesSearch = name.contains(searchText);
+
+                          bool matchesFilter = true;
+                          if (filterOption == "Veg") {
+                            matchesFilter = data['isVeg'] == true;
+                          } else if (filterOption == "Non Veg") {
+                            matchesFilter = data['isVeg'] == false;
+                          }
+                          
+                          return matchesSearch && matchesFilter;
+                        }).toList();
+
+                        if (filteredItems.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.search_off, size: 50, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                const Text("No matching items"),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      searchController.clear();
+                                      filterOption = "All";
+                                    });
+                                  },
+                                  child: const Text("Clear filters"),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          itemCount: filteredItems.length,
+                          itemBuilder: (context, index) {
+                            final doc = filteredItems[index];
+                            final data = doc.data() as Map<String, dynamic>;
+                            final id = doc.id;
+                            final price = (data['price'] ?? 0.0) is double 
+                              ? (data['price'] ?? 0.0) 
+                              : double.parse((data['price'] ?? '0').toString());
+                            bool isVeg = data['isVeg'] ?? false;
+
+                            return Consumer<CartProvider>(
+                              builder: (context, cartProvider, child) {
+                                int quantity = cartProvider.getQuantity(id);
+                                
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 2,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Food Image
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: data['imageUrl'] != null
+                                            ? Image.network(
+                                                data['imageUrl'],
+                                                width: 100,
+                                                height: 100,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => Container(
+                                                  width: 100,
+                                                  height: 100,
+                                                  color: Colors.grey[300],
+                                                  child: const Icon(Icons.restaurant, size: 40),
+                                                ),
+                                              )
+                                            : Container(
+                                                width: 100,
+                                                height: 100,
+                                                color: Colors.grey[300],
+                                                child: const Icon(Icons.restaurant, size: 40),
+                                              ),
+                                        ),
+                                        
+                                        const SizedBox(width: 12),
+                                        
+                                        // Food details
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  // Veg/Non-veg indicator
+                                                  Container(
+                                                    padding: const EdgeInsets.all(2),
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(
+                                                        color: isVeg ? Colors.green : Colors.red,
+                                                      ),
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.circle,
+                                                      size: 8,
+                                                      color: isVeg ? Colors.green : Colors.red,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  // Item name
+                                                  Expanded(
+                                                    child: Text(
+                                                      data['name'] ?? 'Food Item',
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              
+                                              const SizedBox(height: 4),
+                                              
+                                              // Description if available
+                                              if (data['description'] != null)
+                                                Text(
+                                                  data['description'],
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey[600],
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                
+                                              const SizedBox(height: 8),
+                                              
+                                              // Price and add to cart row
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    "₹${price.toStringAsFixed(2)}",
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFFFFB703),
+                                                    ),
+                                                  ),
+                                                  
+                                                  // Add/Remove buttons
+                                                  quantity > 0 
+                                                    ? Row(
+                                                        children: [
+                                                          IconButton(
+                                                            onPressed: () => cartProvider.removeItem(id),
+                                                            icon: const Icon(Icons.remove_circle_outline),
+                                                            color: const Color(0xFFFFB703),
+                                                            padding: EdgeInsets.zero,
+                                                            constraints: const BoxConstraints(
+                                                              minWidth: 32,
+                                                              minHeight: 32,
+                                                            ),
+                                                          ),
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                            decoration: BoxDecoration(
+                                                              color: const Color(0xFFFFB703).withOpacity(0.1),
+                                                              borderRadius: BorderRadius.circular(4),
+                                                            ),
+                                                            child: Text(
+                                                              quantity.toString(),
+                                                              style: const TextStyle(
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          IconButton(
+                                                            onPressed: () => cartProvider.addItem(id),
+                                                            icon: const Icon(Icons.add_circle_outline),
+                                                            color: const Color(0xFFFFB703),
+                                                            padding: EdgeInsets.zero,
+                                                            constraints: const BoxConstraints(
+                                                              minWidth: 32,
+                                                              minHeight: 32,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      )
+                                                    : ElevatedButton(
+                                                        onPressed: () => cartProvider.addItem(id),
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: const Color(0xFFFFB703),
+                                                          foregroundColor: Colors.white,
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                                          minimumSize: const Size(40, 30),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius: BorderRadius.circular(16),
+                                                          ),
+                                                        ),
+                                                        child: const Text("ADD"),
+                                                      ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Quick Actions at bottom
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      width: MediaQuery.of(context).size.width * 0.85,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF9F0),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildQuickAction(
                             context,
-                            Icons.track_changes,
-                            "Track Order",
-                            "Check your current order status",
+                            Icons.track_changes_outlined,
+                            "Track",
                             () => Navigator.pushNamed(context, '/track'),
-                            Colors.blueAccent,
                           ),
-                          _buildActionCard(
+                          _buildQuickAction(
                             context,
-                            Icons.history,
-                            "Order History",
-                            "View your past orders",
+                            Icons.history_outlined,
+                            "History",
                             () => Navigator.pushNamed(context, '/history'),
-                            Colors.purpleAccent,
                           ),
-                          _buildActionCard(
+                          _buildQuickAction(
                             context,
-                            Icons.person,
+                            Icons.person_outline,
                             "Profile",
-                            "View and edit your profile",
                             () => _showProfileDialog(),
-                            Colors.greenAccent,
                           ),
                         ],
                       ),
                     ),
-                    
-                    const SizedBox(height: 10),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -521,6 +848,36 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: Colors.black87,
+            size: 22,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
