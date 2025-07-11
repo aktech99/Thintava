@@ -20,6 +20,9 @@ dependencies:
   # Enhanced notification dependencies
   flutter_local_notifications: ^17.2.4
   
+  # OTP and form dependencies
+  pinput: ^3.0.1  # For OTP input field
+  
   # Other dependencies
   shared_preferences: ^2.5.3   
   google_fonts: ^6.2.1

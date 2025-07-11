@@ -2,8 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:canteen_app/constants/food_quotes.dart';
-import 'package:canteen_app/screens/auth/login_screen.dart';
-import 'package:canteen_app/screens/auth/register_screen.dart';
+import 'package:canteen_app/screens/auth/phone_input_screen.dart';
 import 'package:canteen_app/widgets/fade_in_widget.dart';
 
 class AuthMenu extends StatelessWidget {
@@ -131,7 +130,7 @@ class AuthMenu extends StatelessWidget {
                         child: Column(
                           children: [
                             Text(
-                              'Welcome Back',
+                              'Welcome to Thintava',
                               style: GoogleFonts.poppins(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
@@ -140,11 +139,12 @@ class AuthMenu extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Sign in to continue',
+                              'Quick and secure phone authentication',
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 color: Colors.grey[700],
                               ),
+                              textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 32),
                             SizedBox(
@@ -155,7 +155,7 @@ class AuthMenu extends StatelessWidget {
                                   Navigator.push(
                                     context,
                                     PageRouteBuilder(
-                                      pageBuilder: (_, __, ___) => const LoginScreen(),
+                                      pageBuilder: (_, __, ___) => const PhoneInputScreen(isLogin: true),
                                       transitionDuration: const Duration(milliseconds: 300),
                                       transitionsBuilder: (_, animation, __, child) {
                                         return SlideTransition(
@@ -169,9 +169,16 @@ class AuthMenu extends StatelessWidget {
                                     ),
                                   );
                                 },
-                                child: Text(
-                                  "Login",
-                                  style: GoogleFonts.poppins(fontSize: 16),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.login),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "Login",
+                                      style: GoogleFonts.poppins(fontSize: 16),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -184,7 +191,7 @@ class AuthMenu extends StatelessWidget {
                                   Navigator.push(
                                     context,
                                     PageRouteBuilder(
-                                      pageBuilder: (_, __, ___) => const RegisterScreen(),
+                                      pageBuilder: (_, __, ___) => const PhoneInputScreen(isLogin: false),
                                       transitionDuration: const Duration(milliseconds: 300),
                                       transitionsBuilder: (_, animation, __, child) {
                                         return SlideTransition(
@@ -198,12 +205,19 @@ class AuthMenu extends StatelessWidget {
                                     ),
                                   );
                                 },
-                                child: Text(
-                                  "Register",
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 16,
-                                    color: Theme.of(context).colorScheme.primary,
-                                  ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.person_add),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "Register",
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -215,12 +229,31 @@ class AuthMenu extends StatelessWidget {
                   const Spacer(flex: 2),
                   FadeInWidget(
                     delay: 800,
-                    child: Text(
-                      'Version 1.0.0',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.security, size: 16, color: Colors.grey),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Secure OTP Authentication',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Version 1.0.0',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),

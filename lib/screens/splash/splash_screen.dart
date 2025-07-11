@@ -1,4 +1,4 @@
-// lib/screens/splash/splash_screen.dart - IMPROVED VERSION
+// lib/screens/splash/splash_screen.dart - Updated for SMS Auth
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -31,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _setupAnimations();
     _setupFirebaseMessaging();
     _startAuthListener();
-    print('🎬 Splash screen initialized');
+    print('🎬 Splash screen initialized with SMS auth');
   }
 
   void _setupAnimations() {
@@ -81,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   void _startAuthListener() {
-    print("👂 Starting auth state listener...");
+    print("👂 Starting auth state listener for SMS auth...");
     _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) async {
       if (!mounted || _hasNavigated || _isProcessingAuth) return;
 
@@ -97,7 +97,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         }
 
         print("🟢 User found: ${user.uid}");
-        print("📧 User email: ${user.email}");
+        print("📱 User phone: ${user.phoneNumber ?? 'No phone'}");
         
         // Wait longer for session registration to complete
         print("⏳ Waiting for session to stabilize...");
@@ -320,19 +320,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           print("📋 User role found: $role");
           return role;
         } else {
-          print("📋 No user document found, creating default...");
-          try {
-            await FirebaseFirestore.instance.collection('users').doc(userId).set({
-              'role': 'user',
-              'email': FirebaseAuth.instance.currentUser?.email,
-              'createdAt': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-            print("📋 Created default user document");
-            return 'user';
-          } catch (e) {
-            print("❌ Error creating user document: $e");
-            return 'user';
-          }
+          print("📋 No user document found, user might not be properly registered");
+          // For SMS auth, if no document found, user registration failed
+          throw Exception('User profile not found. Please register again.');
         }
       } catch (e) {
         retries++;
@@ -341,8 +331,30 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         if (retries < maxRetries) {
           await Future.delayed(Duration(seconds: retries));
         } else {
-          print("❌ Failed to fetch role after $maxRetries attempts, defaulting to 'user'");
-          return 'user';
+          print("❌ Failed to fetch role after $maxRetries attempts");
+          
+          // For SMS auth, we should not default to 'user' if the document doesn't exist
+          // This indicates a registration issue
+          if (e.toString().contains('User profile not found')) {
+            // Force logout and redirect to registration
+            await _authService.logout();
+            if (mounted && !_hasNavigated) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Profile not found. Please register again.',
+                    style: GoogleFonts.poppins(),
+                  ),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              _navigateToAuth();
+            }
+            throw e;
+          }
+          
+          return 'user'; // Fallback for other errors
         }
       }
     }

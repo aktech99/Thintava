@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:canteen_app/screens/auth/auth_menu.dart';
-import 'package:canteen_app/screens/auth/login_screen.dart';
-import 'package:canteen_app/screens/auth/register_screen.dart';
+import 'package:canteen_app/screens/auth/phone_input_screen.dart';
+import 'package:canteen_app/screens/auth/otp_verification_screen.dart';
 import 'package:canteen_app/screens/user/menu_screen.dart';
 import 'package:canteen_app/screens/user/cart_screen.dart';
 import 'package:canteen_app/screens/user/order_tracking_screen.dart';
@@ -20,8 +20,11 @@ class RouteConfig {
   static Map<String, WidgetBuilder> get routes {
     return {
       '/auth': (_) => const AuthMenu(),
+      '/phone-input': (_) => const PhoneInputScreen(),
+      '/phone-login': (_) => const PhoneInputScreen(isLogin: true),
+      '/phone-register': (_) => const PhoneInputScreen(isLogin: false),
       '/menu': (_) => const MenuScreen(),
-      '/cart': (_) => const CartScreen(), // REMOVED THE CART PARAMETER
+      '/cart': (_) => const CartScreen(),
       '/splash': (context) => const SplashScreen(),
       '/track': (_) => const OrderTrackingScreen(),
       '/kitchen': (_) => const KitchenDashboard(),

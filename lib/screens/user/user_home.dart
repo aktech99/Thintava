@@ -1,4 +1,4 @@
-// lib/screens/user/user_home.dart
+// lib/screens/user/user_home.dart - Updated for SMS auth
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,6 +18,9 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   final _authService = AuthService();
+  
+  Map<String, dynamic>? _userData;
+  bool _isLoadingUserData = true;
 
   @override
   void initState() {
@@ -43,11 +46,34 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
     );
 
     _fadeController.forward();
+    _loadUserData();
     
     // Start listening for session changes
     _authService.startSessionListener(() {
       logout(context, forceLogout: true);
     });
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        final userData = await _authService.getUserData(user.uid);
+        if (mounted) {
+          setState(() {
+            _userData = userData;
+            _isLoadingUserData = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingUserData = false;
+        });
+      }
+    }
   }
 
   void logout(BuildContext context, {bool forceLogout = false}) async {
@@ -166,20 +192,45 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
+                    
+                    // User greeting with username or phone
+                    _isLoadingUserData
+                      ? Container(
+                          height: 60,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Hello, ${_getUserDisplayName()}!",
+                              style: GoogleFonts.poppins(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF023047),
+                              ),
+                            ),
+                            if (_userData?['phoneNumber'] != null)
+                              Text(
+                                _userData!['phoneNumber'],
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: const Color(0xFF023047).withOpacity(0.7),
+                                ),
+                              ),
+                          ],
+                        ),
+                    
+                    const SizedBox(height: 8),
                     Text(
                       "What would you like today?",
                       style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF023047),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Explore our delicious menu options",
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: const Color(0xFF023047).withOpacity(0.7),
+                        fontSize: 18,
+                        color: const Color(0xFF023047).withOpacity(0.8),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -244,11 +295,11 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
                           ),
                           _buildActionCard(
                             context,
-                            Icons.local_offer,
-                            "Special Deals",
-                            "Check out today's offers",
-                            () => Navigator.pushNamed(context, '/deals'),
-                            Colors.redAccent,
+                            Icons.person,
+                            "Profile",
+                            "View and edit your profile",
+                            () => _showProfileDialog(),
+                            Colors.greenAccent,
                           ),
                         ],
                       ),
@@ -263,6 +314,106 @@ class _UserHomeState extends State<UserHome> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  String _getUserDisplayName() {
+    if (_userData != null && _userData!['username'] != null) {
+      return _userData!['username'];
+    }
+    
+    // Fallback to phone number without country code
+    final user = _authService.currentUser;
+    if (user?.phoneNumber != null) {
+      String phone = user!.phoneNumber!;
+      // Remove country code and show last 4 digits
+      if (phone.length > 4) {
+        return "User${phone.substring(phone.length - 4)}";
+      }
+      return "User";
+    }
+    
+    return "User";
+  }
+
+  void _showProfileDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Profile Information',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_userData != null) ...[
+              _buildProfileRow('Username', _userData!['username'] ?? 'Not set'),
+              _buildProfileRow('Phone', _userData!['phoneNumber'] ?? 'Not set'),
+              _buildProfileRow('Role', _userData!['role'] ?? 'user'),
+              _buildProfileRow('Member since', _formatDate(_userData!['createdAt'])),
+            ] else ...[
+              Text('Loading profile...', style: GoogleFonts.poppins()),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: GoogleFonts.poppins(
+                color: const Color(0xFFFFB703),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return 'Unknown';
+    try {
+      DateTime date;
+      if (timestamp is DateTime) {
+        date = timestamp;
+      } else {
+        date = timestamp.toDate();
+      }
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return 'Unknown';
+    }
   }
 
   Widget _buildCategoryItem(IconData icon, String label) {

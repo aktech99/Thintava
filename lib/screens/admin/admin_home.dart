@@ -3,12 +3,66 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:canteen_app/services/auth_service.dart';
 import 'dart:ui';
 
-class AdminHome extends StatelessWidget {
+class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
+
+  @override
+  State<AdminHome> createState() => _AdminHomeState();
+}
+
+class _AdminHomeState extends State<AdminHome> {
+  final _authService = AuthService();
+  Map<String, dynamic>? _userData;
+  bool _isLoadingUserData = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = _authService.currentUser;
+      if (user != null) {
+        final userData = await _authService.getUserData(user.uid);
+        if (mounted) {
+          setState(() {
+            _userData = userData;
+            _isLoadingUserData = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingUserData = false;
+        });
+      }
+    }
+  }
+
+  String _getUserDisplayName() {
+    if (_userData != null && _userData!['username'] != null) {
+      return _userData!['username'];
+    }
+    
+    // Fallback to phone number without country code
+    final user = _authService.currentUser;
+    if (user?.phoneNumber != null) {
+      String phone = user!.phoneNumber!;
+      // Remove country code and show last 4 digits
+      if (phone.length > 4) {
+        return "Admin${phone.substring(phone.length - 4)}";
+      }
+      return "Admin";
+    }
+    
+    return "Admin";
+  }
   
   void logout(BuildContext context) async {
-    final authService = AuthService();
-    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -49,16 +103,14 @@ class AdminHome extends StatelessWidget {
     );
 
     if (confirmed ?? false) {
-      await authService.logout();
+      await _authService.logout();
       Navigator.of(context).pushNamedAndRemoveUntil('/auth', (route) => false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authService = AuthService();
     final size = MediaQuery.of(context).size;
-    final user = authService.currentUser;
     
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -158,14 +210,23 @@ class AdminHome extends StatelessWidget {
                               child: CircleAvatar(
                                 radius: 35,
                                 backgroundColor: Colors.white,
-                                child: Text(
-                                  user?.email?.substring(0, 1).toUpperCase() ?? 'A',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.bold,
-                                    color: const Color(0xFFFFB703),
-                                  ),
-                                ),
+                                child: _isLoadingUserData
+                                  ? SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFB703)),
+                                      ),
+                                    )
+                                  : Text(
+                                      _getUserDisplayName().substring(0, 1).toUpperCase(),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFFFFB703),
+                                      ),
+                                    ),
                               ),
                             ),
                             const SizedBox(width: 20),
@@ -182,15 +243,24 @@ class AdminHome extends StatelessWidget {
                                       color: Colors.grey[600],
                                     ),
                                   ),
-                                  Text(
-                                    user?.email?.split('@')[0] ?? 'Admin',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
+                                  _isLoadingUserData
+                                    ? Container(
+                                        height: 20,
+                                        width: 120,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[300],
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                      )
+                                    : Text(
+                                        _getUserDisplayName(),
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                   const SizedBox(height: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
@@ -310,77 +380,6 @@ class AdminHome extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard({
-    required String title,
-    required String value,
-    required String subtitle,
-    required Color iconBgColor,
-    required Color iconColor,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            spreadRadius: 0,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: iconColor,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                Text(
-                  value,
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActionCard(
     BuildContext context, {
     required String title,
@@ -453,60 +452,6 @@ class AdminHome extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildActivityItem({
-    required String title,
-    required String time,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: color,
-            ),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  time,
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.more_horiz,
-            color: Colors.grey[400],
-          ),
-        ],
       ),
     );
   }
