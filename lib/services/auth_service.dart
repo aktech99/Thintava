@@ -395,6 +395,43 @@ class AuthService {
     }
   }
 
+  Future<UserCredential> login(String email, String password) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return credential;
+    } catch (e) {
+      print('Error during login: $e');
+      rethrow;
+    }
+  }
+
+  Future<UserCredential> register(String email, String password, String username) async {
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Create user document in Firestore
+      if (credential.user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(credential.user!.uid).set({
+          'username': username,
+          'email': email,
+          'role': 'user',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      return credential;
+    } catch (e) {
+      print('Error during registration: $e');
+      rethrow;
+    }
+  }
+
   // Safe FCM Token clearing method
   Future<void> _clearFCMTokenSafely(String uid) async {
     try {

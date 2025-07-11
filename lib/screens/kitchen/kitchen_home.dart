@@ -97,229 +97,266 @@ class _KitchenHomeState extends State<KitchenHome> {
   Widget build(BuildContext context) {
     return SessionChecker(
       authService: _authService,
-      child: Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                const Color(0xFFFFB703).withOpacity(0.9),
-                const Color(0xFFFFB703).withOpacity(0.7),
-              ],
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Kitchen Portal',
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _authService.currentUser?.displayName != null
-                                ? 'Welcome, ${_authService.currentUser!.displayName}'
-                                : 'Welcome, Chef',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.logout,
-                          color: Colors.black87,
-                          size: 28,
-                        ),
-                        onPressed: () async {
-                          // Show confirmation dialog
-                          final confirmed = await showDialog<bool>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Logout'),
-                              content: const Text('Are you sure you want to logout?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => Navigator.pop(context, true),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFFFB703),
-                                  ),
-                                  child: const Text('Logout'),
-                                ),
-                              ],
-                            ),
-                          );
-                          
-                          if (confirmed == true) {
-                            // Use AuthService instead of FirebaseAuth directly
-                            await _authService.logout();
-                            if (mounted) {
-                              Navigator.pushReplacementNamed(context, '/auth');
-                            }
-                          }
-                        },
-                      ),
-                    ],
+      child: WillPopScope(
+        onWillPop: () async {
+          // Show exit confirmation dialog
+          final shouldExit = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(
+                'Exit App',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Text(
+                'Do you want to exit the app?',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'No',
+                    style: TextStyle(color: Colors.grey[700]),
                   ),
                 ),
-                const SizedBox(height: 30),
-                
-                // Stats Cards
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Row(
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB703),
+                  ),
+                  child: const Text('Yes'),
+                ),
+              ],
+            ),
+          );
+          return shouldExit ?? false;
+        },
+        child: Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFFFFB703).withOpacity(0.9),
+                  const Color(0xFFFFB703).withOpacity(0.7),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: _StatCard(
-                                title: 'Active',
-                                value: _orderStats['active'] ?? 0,
-                                icon: Icons.local_fire_department,
-                                color: Colors.orange,
+                            Text(
+                              'Kitchen Portal',
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatCard(
-                                title: 'Pending',
-                                value: _orderStats['pending'] ?? 0,
-                                icon: Icons.access_time,
-                                color: Colors.blue,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatCard(
-                                title: 'Completed',
-                                value: _orderStats['completed'] ?? 0,
-                                icon: Icons.check_circle,
-                                color: const Color(0xFF004D40),
+                            const SizedBox(height: 4),
+                            Text(
+                              _authService.currentUser?.displayName != null
+                                  ? 'Welcome, ${_authService.currentUser!.displayName}'
+                                  : 'Welcome, Chef',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Colors.black87,
                               ),
                             ),
                           ],
                         ),
-                ),
-                
-                // Main Content Area
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 36),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(30),
-                        topRight: Radius.circular(30),
-                      ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.logout,
+                            color: Colors.black87,
+                            size: 28,
+                          ),
+                          onPressed: () async {
+                            // Show confirmation dialog
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Logout'),
+                                content: const Text('Are you sure you want to logout?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFFB703),
+                                    ),
+                                    child: const Text('Logout'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            
+                            if (confirmed == true) {
+                              // Use AuthService instead of FirebaseAuth directly
+                              await _authService.logout();
+                              if (mounted) {
+                                Navigator.pushReplacementNamed(context, '/auth');
+                              }
+                            }
+                          },
+                        ),
+                      ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Kitchen Management',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
+                  ),
+                  const SizedBox(height: 30),
+                  
+                  // Stats Cards
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _isLoading
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          
-                          // Dashboard Tiles
-                          Expanded(
-                            child: GridView.count(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              children: [
-                                _MenuTile(
-                                  title: 'Order Dashboard',
-                                  icon: Icons.dashboard_customize,
-                                  color: const Color(0xFFFFB703),
-                                  onTap: _navigateToKitchenDashboard,
+                          )
+                        : Row(
+                            children: [
+                              Expanded(
+                                child: _StatCard(
+                                  title: 'Active',
+                                  value: _orderStats['active'] ?? 0,
+                                  icon: Icons.local_fire_department,
+                                  color: Colors.orange,
                                 ),
-                                _MenuTile(
-                                  title: 'Inventory',
-                                  icon: Icons.inventory,
-                                  color: Colors.blueAccent,
-                                  onTap: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Text('Inventory module coming soon!'),
-                                        backgroundColor: const Color(0xFFFFB703),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  },
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _StatCard(
+                                  title: 'Pending',
+                                  value: _orderStats['pending'] ?? 0,
+                                  icon: Icons.access_time,
+                                  color: Colors.blue,
                                 ),
-                                _MenuTile(
-                                  title: 'Staff Schedule',
-                                  icon: Icons.schedule,
-                                  color: Colors.purple,
-                                  onTap: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Text('Staff scheduling module coming soon!'),
-                                        backgroundColor: const Color(0xFFFFB703),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  },
-                                ),
-                                _MenuTile(
-                                  title: 'Reports',
-                                  icon: Icons.bar_chart,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _StatCard(
+                                  title: 'Completed',
+                                  value: _orderStats['completed'] ?? 0,
+                                  icon: Icons.check_circle,
                                   color: const Color(0xFF004D40),
-                                  onTap: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Text('Reports module coming soon!'),
-                                        backgroundColor: const Color(0xFFFFB703),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  },
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
+                  ),
+                  
+                  // Main Content Area
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 36),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(30),
+                          topRight: Radius.circular(30),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Kitchen Management',
+                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            
+                            // Dashboard Tiles
+                            Expanded(
+                              child: GridView.count(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                                children: [
+                                  _MenuTile(
+                                    title: 'Order Dashboard',
+                                    icon: Icons.dashboard_customize,
+                                    color: const Color(0xFFFFB703),
+                                    onTap: _navigateToKitchenDashboard,
+                                  ),
+                                  _MenuTile(
+                                    title: 'Inventory',
+                                    icon: Icons.inventory,
+                                    color: Colors.blueAccent,
+                                    onTap: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Text('Inventory module coming soon!'),
+                                          backgroundColor: const Color(0xFFFFB703),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _MenuTile(
+                                    title: 'Staff Schedule',
+                                    icon: Icons.schedule,
+                                    color: Colors.purple,
+                                    onTap: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Text('Staff scheduling module coming soon!'),
+                                          backgroundColor: const Color(0xFFFFB703),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _MenuTile(
+                                    title: 'Reports',
+                                    icon: Icons.bar_chart,
+                                    color: const Color(0xFF004D40),
+                                    onTap: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: const Text('Reports module coming soon!'),
+                                          backgroundColor: const Color(0xFFFFB703),
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          backgroundColor: const Color(0xFFFFB703),
-          foregroundColor: Colors.black87,
-          onPressed: _fetchOrderStats,
-          child: const Icon(Icons.refresh),
+          floatingActionButton: FloatingActionButton(
+            backgroundColor: const Color(0xFFFFB703),
+            foregroundColor: Colors.black87,
+            onPressed: _fetchOrderStats,
+            child: const Icon(Icons.refresh),
+          ),
         ),
       ),
     );

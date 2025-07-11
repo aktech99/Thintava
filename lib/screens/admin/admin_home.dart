@@ -112,270 +112,305 @@ class _AdminHomeState extends State<AdminHome> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     
-    return Scaffold(
-      backgroundColor: Colors.grey[100],
-      body: Stack(
-        children: [
-          // Background gradient with waves
-          Container(
-            height: size.height * 0.4,
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFFFB703), Color(0xFFFFC124)],
+    return WillPopScope(
+      onWillPop: () async {
+        // Show exit confirmation dialog
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              'Exit App',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+            ),
+            content: Text(
+              'Do you want to exit the app?',
+              style: GoogleFonts.poppins(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'No',
+                  style: GoogleFonts.poppins(color: Colors.grey),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(
+                  'Yes',
+                  style: GoogleFonts.poppins(color: Theme.of(context).primaryColor),
+                ),
+              ),
+            ],
+          ),
+        );
+        return shouldExit ?? false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[100],
+        body: Stack(
+          children: [
+            // Background gradient with waves
+            Container(
+              height: size.height * 0.4,
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFFB703), Color(0xFFFFC124)],
+                ),
+              ),
+              child: CustomPaint(
+                painter: WavePainter(),
+                child: Container(),
               ),
             ),
-            child: CustomPaint(
-              painter: WavePainter(),
-              child: Container(),
-            ),
-          ),
-          
-          // Main Content
-          SafeArea(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Top App Bar
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Admin Dashboard',
-                          style: GoogleFonts.poppins(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+            
+            // Main Content
+            SafeArea(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top App Bar
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Admin Dashboard',
+                            style: GoogleFonts.poppins(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        // Logout Icon Button
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.logout_rounded, color: Colors.white),
-                            onPressed: () => logout(context),
-                            tooltip: 'Logout',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // User Profile Card
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
+                          // Logout Icon Button
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(Icons.logout_rounded, color: Colors.white),
+                              onPressed: () => logout(context),
+                              tooltip: 'Logout',
+                            ),
                           ),
                         ],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Row(
-                          children: [
-                            // Avatar with animated border
-                            Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFFFFB703), Color(0xFFFFC93C)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFFFFB703).withOpacity(0.5),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                              child: CircleAvatar(
-                                radius: 35,
-                                backgroundColor: Colors.white,
-                                child: _isLoadingUserData
-                                  ? SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFB703)),
-                                      ),
-                                    )
-                                  : Text(
-                                      _getUserDisplayName().substring(0, 1).toUpperCase(),
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 30,
-                                        fontWeight: FontWeight.bold,
-                                        color: const Color(0xFFFFB703),
-                                      ),
-                                    ),
-                              ),
-                            ),
-                            const SizedBox(width: 20),
-                            
-                            // User info
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Welcome back,',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 16,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  _isLoadingUserData
-                                    ? Container(
-                                        height: 20,
-                                        width: 120,
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[300],
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                      )
-                                    : Text(
-                                        _getUserDisplayName(),
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black87,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                  const SizedBox(height: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFB703).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      'Admin',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: const Color(0xFFFFB703),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    ),
+                    
+                    // User Profile Card
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  ),
-                  
-                  // Quick Actions Header
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 30, 20, 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Quick Actions',
-                          style: GoogleFonts.poppins(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Row(
+                            children: [
+                              // Avatar with animated border
+                              Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFFFFB703), Color(0xFFFFC93C)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFFFB703).withOpacity(0.5),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 35,
+                                  backgroundColor: Colors.white,
+                                  child: _isLoadingUserData
+                                    ? SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFB703)),
+                                        ),
+                                      )
+                                    : Text(
+                                        _getUserDisplayName().substring(0, 1).toUpperCase(),
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 30,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFFFFB703),
+                                        ),
+                                      ),
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              
+                              // User info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Welcome back,',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    _isLoadingUserData
+                                      ? Container(
+                                          height: 20,
+                                          width: 120,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[300],
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        )
+                                      : Text(
+                                          _getUserDisplayName(),
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFB703).withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        'Admin',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: const Color(0xFFFFB703),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                       ],
+                      ),
                     ),
-                  ),
-                  
-                  // Action Cards Grid
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.85,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      children: [
-                        _buildActionCard(
-                          context,
-                          title: 'Manage Menu',
-                          subtitle: 'Edit Menu',
-                          icon: Icons.restaurant_menu,
-                          color: Colors.orange,
-                          onTap: () => Navigator.pushNamed(context, '/admin/menu'),
-                        ),
-                        _buildActionCard(
-                          context,
-                          title: 'Live Orders',
-                          subtitle: 'View and manage current orders',
-                          icon: Icons.receipt_long,
-                          color: Colors.red,
-                          onTap: () => Navigator.pushNamed(context, '/admin/live-orders'),
-                        ),
-                        _buildActionCard(
-                          context,
-                          title: 'Order History',
-                          subtitle: 'View past orders',
-                          icon: Icons.history,
-                          color: Colors.blue,
-                          onTap: () => Navigator.pushNamed(context, '/admin/admin-history'),
-                        ),
-                        _buildActionCard(
-                          context,
-                          title: 'Kitchen View',
-                          subtitle: 'Monitor kitchen operations',
-                          icon: Icons.kitchen,
-                          color: Colors.green,
-                          onTap: () => Navigator.pushNamed(context, '/admin/admin-kitchen-view'),
-                        ),
-                      ],
+                    
+                    // Quick Actions Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 30, 20, 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Quick Actions',
+                            style: GoogleFonts.poppins(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                         ],
+                      ),
                     ),
-                  ),
-                  
-               
-                  // Version Footer
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'Thintava Admin v1.0.0',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey,
-                          fontSize: 12,
+                    
+                    // Action Cards Grid
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.85,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        children: [
+                          _buildActionCard(
+                            context,
+                            title: 'Manage Menu',
+                            subtitle: 'Edit Menu',
+                            icon: Icons.restaurant_menu,
+                            color: Colors.orange,
+                            onTap: () => Navigator.pushNamed(context, '/admin/menu'),
+                          ),
+                          _buildActionCard(
+                            context,
+                            title: 'Live Orders',
+                            subtitle: 'View and manage current orders',
+                            icon: Icons.receipt_long,
+                            color: Colors.red,
+                            onTap: () => Navigator.pushNamed(context, '/admin/live-orders'),
+                          ),
+                          _buildActionCard(
+                            context,
+                            title: 'Order History',
+                            subtitle: 'View past orders',
+                            icon: Icons.history,
+                            color: Colors.blue,
+                            onTap: () => Navigator.pushNamed(context, '/admin/admin-history'),
+                          ),
+                          _buildActionCard(
+                            context,
+                            title: 'Kitchen View',
+                            subtitle: 'Monitor kitchen operations',
+                            icon: Icons.kitchen,
+                            color: Colors.green,
+                            onTap: () => Navigator.pushNamed(context, '/admin/admin-kitchen-view'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                 
+                    // Version Footer
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'Thintava Admin v1.0.0',
+                          style: GoogleFonts.poppins(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  
-                  // Bottom Spacing
-                  const SizedBox(height: 20),
-                ],
+                    
+                    // Bottom Spacing
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

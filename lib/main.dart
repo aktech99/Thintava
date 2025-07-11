@@ -5,9 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 // Import only essential components
+import 'package:canteen_app/providers/app_state_provider.dart';
 import 'package:canteen_app/providers/cart_provider.dart';
-import 'package:canteen_app/screens/splash/splash_screen.dart';
 import 'package:canteen_app/config/route_config.dart';
+import 'package:canteen_app/screens/splash/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +29,11 @@ class ThintavaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => CartProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppStateProvider()),
+        ChangeNotifierProvider(create: (_) => CartProvider()),
+      ],
       child: MaterialApp(
         title: 'Thintava',
         debugShowCheckedModeBanner: false,
@@ -58,15 +62,39 @@ class ThintavaApp extends StatelessWidget {
               borderSide: const BorderSide(color: Color(0xFFFFB703), width: 2),
             ),
           ),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFFFB703),
+            primary: const Color(0xFFFFB703),
+            secondary: const Color(0xFF023047),
+          ),
         ),
-        home: const SplashScreen(),
-        routes: RouteConfig.routes,
+        initialRoute: '/',
+        routes: {
+          '/splash': (context) => const SplashScreen(),
+          ...routes,
+        },
         onUnknownRoute: (settings) {
+          print('⚠️ Unknown route: ${settings.name}');
           return MaterialPageRoute(
             builder: (context) => Scaffold(
               appBar: AppBar(title: const Text('Error')),
-              body: const Center(
-                child: Text('Page not found'),
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Page not found',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Route: ${settings.name}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
               ),
             ),
           );

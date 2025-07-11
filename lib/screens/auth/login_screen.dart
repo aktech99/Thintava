@@ -58,34 +58,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
       final user = await auth.login(
         emailController.text.trim(),
-        passwordController.text.trim()
+        passwordController.text,
       );
-
-      if (user != null && mounted) {
-        print("✅ Login successful for user: ${user.uid}");
-
-        // Show success message briefly
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Login successful! Redirecting...',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-
-        // Small delay to show success message
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        if (mounted) {
-          // Navigate to splash screen which will handle role-based routing
-          Navigator.pushReplacementNamed(context, '/splash');
-        }
-      } else {
-        _showError("Login failed - no user returned");
+      print("✅ Login successful for user: ${user.user?.uid}");
+      if (context.mounted) {
+        Navigator.pushReplacementNamed(context, '/');
       }
     } catch (e) {
       print("❌ Login error: $e");
