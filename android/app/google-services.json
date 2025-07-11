@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:626390741302:android:aca3d0b0b5d899ec2ec397",
+        "mobilesdk_app_id": "1:626390741302:android:1c149a60f3ac2f952ec397",
         "android_client_info": {
-          "package_name": "com.example.thintava_sip"
+          "package_name": "com.thintava.app"
         }
       },
       "oauth_client": [],

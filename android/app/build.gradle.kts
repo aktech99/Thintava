@@ -7,8 +7,8 @@ plugins {
 }
 
 android {
-    namespace = "com.example.thintava_sip"
-    compileSdk = 35  // ← Changed from 34 to 35
+    namespace = "com.thintava.app"  // ← CHANGED from com.example.thintava_sip
+    compileSdk = 35
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -22,9 +22,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.thintava_sip"
+        applicationId = "com.thintava.app"  // ← CHANGED from com.example.thintava_sip
         minSdk = 23
-        targetSdk = 35  // ← Changed from 34 to 35
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
