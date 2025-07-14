@@ -838,7 +838,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              '📞 Call us: +91 70751 90904',
+              '📞 Call us: +91 12345 67890',
               style: GoogleFonts.poppins(fontSize: 14),
             ),
             const SizedBox(height: 8),
@@ -847,6 +847,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: GoogleFonts.poppins(fontSize: 14),
             ),
             const SizedBox(height: 8),
+            Text(
+              '🕒 Hours: 9 AM - 10 PM',
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
           ],
         ),
         actions: [
@@ -928,7 +932,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              '© 2025 Thintava. All rights reserved.',
+              '© 2024 Thintava. All rights reserved.',
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 color: Colors.grey[600],
@@ -1010,14 +1014,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: ElevatedButton(
               onPressed: () async {
-                Navigator.pop(context);
+                Navigator.pop(context); // Close the dialog first
                 
-                // Clear cart on logout
-                Provider.of<CartProvider>(context, listen: false).clearCart();
+                // Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFFFFB703),
+                    ),
+                  ),
+                );
                 
-                // Use AuthService instead of FirebaseAuth directly
-                await _authService.logout();
-                Navigator.pushReplacementNamed(context, '/auth');
+                try {
+                  // Clear cart on logout
+                  Provider.of<CartProvider>(context, listen: false).clearCart();
+                  
+                  // Use AuthService to logout
+                  await _authService.logout();
+                  
+                  // Close loading dialog
+                  Navigator.pop(context);
+                  
+                  // Navigate to auth screen and clear all previous routes
+                  Navigator.pushNamedAndRemoveUntil(
+                    context, 
+                    '/auth',
+                    (route) => false, // This removes all previous routes
+                  );
+                } catch (e) {
+                  // Close loading dialog
+                  Navigator.pop(context);
+                  
+                  // Show error message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error, color: Colors.white),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Logout failed. Please try again.',
+                            style: GoogleFonts.poppins(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFFF44336),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.all(16),
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
