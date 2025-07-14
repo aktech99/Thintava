@@ -9,7 +9,7 @@ class PhoneInputScreen extends StatefulWidget {
   
   const PhoneInputScreen({
     Key? key,
-    this.isLogin = false,
+    this.isLogin = true, // Default to true since we only have login now
   }) : super(key: key);
 
   @override
@@ -56,12 +56,6 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
   void _sendOTP() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Validate username for registration
-    if (!widget.isLogin && _usernameController.text.trim().isEmpty) {
-      _showError('Please enter a username');
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
@@ -75,7 +69,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
                 builder: (context) => OTPVerificationScreen(
                   phoneNumber: _fullPhoneNumber,
                   username: _usernameController.text.trim(),
-                  isLogin: widget.isLogin,
+                  isLogin: true, // Always true for unified flow
                 ),
               ),
             );
@@ -98,7 +92,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
         _showError('Failed to send OTP. Please try again.');
       }
     } catch (e) {
-      _showError(e.toString());
+      _showError('Error: ${e.toString()}');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -113,7 +107,7 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
           message,
           style: GoogleFonts.poppins(),
         ),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -122,112 +116,102 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: Text(
-          widget.isLogin ? "Login" : "Register",
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
+      body: Stack(
+        children: [
+          // Gradient background
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFFB703),
+                  Color(0xFFF59E0B),
+                  Color(0xFFD97706),
+                ],
+              ),
+            ),
           ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFB703), Color(0xFFFFC107)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          // Glassmorphism decorations
+          Positioned(
+            top: -50,
+            right: -100,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+              ),
+            ),
           ),
-        ),
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Center(
+          SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Icon
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 20,
-                          spreadRadius: 5,
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 40),
+                    // Back button
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(
+                            Icons.arrow_back_ios,
+                            color: Colors.white,
+                          ),
                         ),
                       ],
                     ),
-                    child: Icon(
-                      widget.isLogin ? Icons.login : Icons.person_add,
-                      size: 60,
-                      color: const Color(0xFFFFB703),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Glass card form
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                      child: Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.85),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.3)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                    const SizedBox(height: 20),
+                    
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            padding: const EdgeInsets.all(32),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                              ),
                             ),
-                          ],
-                        ),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.isLogin ? "Welcome Back" : "Create Account",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Header
+                                Text(
+                                  "Welcome!",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                widget.isLogin 
-                                  ? "Enter your phone number to login"
-                                  : "Enter your details to get started",
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  color: Colors.black54,
+                                const SizedBox(height: 8),
+                                Text(
+                                  "Enter your phone number to continue",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    color: Colors.black54,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 24),
+                                const SizedBox(height: 32),
 
-                              // Username field (only for registration)
-                              if (!widget.isLogin) ...[
+                                // Username field (optional for better UX)
                                 TextFormField(
                                   controller: _usernameController,
                                   style: GoogleFonts.poppins(),
                                   decoration: InputDecoration(
-                                    labelText: "Username",
+                                    labelText: "Display Name (Optional)",
                                     labelStyle: GoogleFonts.poppins(color: Colors.black54),
                                     prefixIcon: const Icon(Icons.person, color: Color(0xFFFFB703)),
                                     filled: true,
@@ -240,184 +224,191 @@ class _PhoneInputScreenState extends State<PhoneInputScreen>
                                       borderRadius: BorderRadius.circular(12),
                                       borderSide: const BorderSide(color: Color(0xFFFFB703), width: 2),
                                     ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, 
+                                      vertical: 14,
+                                    ),
+                                    hintText: "Enter your preferred name",
+                                    hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
                                   ),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Please enter a username';
-                                    }
-                                    if (value.trim().length < 3) {
-                                      return 'Username must be at least 3 characters';
-                                    }
-                                    if (value.trim().length > 20) {
-                                      return 'Username must be less than 20 characters';
-                                    }
-                                    // Check for valid characters
-                                    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value.trim())) {
-                                      return 'Username can only contain letters, numbers, and underscore';
-                                    }
-                                    return null;
-                                  },
                                 ),
                                 const SizedBox(height: 16),
-                              ],
 
-                              // Phone number field
-                              Row(
-                                children: [
-                                  // Country code dropdown
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.grey.shade300),
+                                // Phone number field
+                                Row(
+                                  children: [
+                                    // Country code dropdown
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: Colors.grey.shade300),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          value: _selectedCountryCode,
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.black87,
+                                            fontSize: 16,
+                                          ),
+                                          items: const [
+                                            DropdownMenuItem(value: '+91', child: Text('+91')),
+                                            DropdownMenuItem(value: '+1', child: Text('+1')),
+                                            DropdownMenuItem(value: '+44', child: Text('+44')),
+                                            DropdownMenuItem(value: '+86', child: Text('+86')),
+                                          ],
+                                          onChanged: (value) {
+                                            setState(() {
+                                              _selectedCountryCode = value!;
+                                            });
+                                          },
+                                        ),
+                                      ),
                                     ),
-                                    child: DropdownButtonHideUnderline(
-                                      child: DropdownButton<String>(
-                                        value: _selectedCountryCode,
-                                        icon: const Icon(Icons.arrow_drop_down, color: Color(0xFFFFB703)),
-                                        style: GoogleFonts.poppins(color: Colors.black87),
-                                        onChanged: (String? newValue) {
-                                          setState(() {
-                                            _selectedCountryCode = newValue!;
-                                          });
+                                    const SizedBox(width: 12),
+                                    // Phone number input
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _phoneController,
+                                        keyboardType: TextInputType.phone,
+                                        style: GoogleFonts.poppins(),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Please enter your phone number';
+                                          }
+                                          if (value.length < 10) {
+                                            return 'Please enter a valid phone number';
+                                          }
+                                          return null;
                                         },
-                                        items: <String>['+91', '+1', '+44', '+61', '+81']
-                                            .map<DropdownMenuItem<String>>((String value) {
-                                          return DropdownMenuItem<String>(
-                                            value: value,
-                                            child: Text(value),
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  
-                                  // Phone number input
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: _phoneController,
-                                      keyboardType: TextInputType.phone,
-                                      style: GoogleFonts.poppins(),
-                                      decoration: InputDecoration(
-                                        labelText: "Phone Number",
-                                        labelStyle: GoogleFonts.poppins(color: Colors.black54),
-                                        prefixIcon: const Icon(Icons.phone, color: Color(0xFFFFB703)),
-                                        filled: true,
-                                        fillColor: Colors.white,
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                          borderSide: const BorderSide(color: Color(0xFFFFB703), width: 2),
-                                        ),
-                                      ),
-                                      validator: (value) {
-                                        if (value == null || value.isEmpty) {
-                                          return 'Please enter phone number';
-                                        }
-                                        if (value.length < 10) {
-                                          return 'Please enter a valid phone number';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              
-                              const SizedBox(height: 24),
-
-                              // Send OTP button
-                              SizedBox(
-                                width: double.infinity,
-                                height: 56,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _sendOTP,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFFFB703),
-                                    foregroundColor: Colors.black87,
-                                    disabledBackgroundColor: Colors.grey.shade300,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    elevation: 5,
-                                  ),
-                                  child: _isLoading
-                                    ? const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
-                                        ),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.sms),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            "Send OTP",
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        decoration: InputDecoration(
+                                          labelText: "Phone Number",
+                                          labelStyle: GoogleFonts.poppins(color: Colors.black54),
+                                          prefixIcon: const Icon(Icons.phone, color: Color(0xFFFFB703)),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: BorderSide.none,
                                           ),
-                                        ],
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: const BorderSide(color: Color(0xFFFFB703), width: 2),
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 16, 
+                                            vertical: 14,
+                                          ),
+                                          hintText: "Enter your phone number",
+                                          hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
+                                        ),
                                       ),
+                                    ),
+                                  ],
                                 ),
-                              ),
 
-                              const SizedBox(height: 16),
+                                const SizedBox(height: 24),
 
-                              // Switch between login/register
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    widget.isLogin 
-                                      ? "Don't have an account?" 
-                                      : "Already have an account?",
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.black54,
+                                // Info card
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFB703).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFFFB703).withOpacity(0.3),
                                     ),
                                   ),
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pushReplacement(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => PhoneInputScreen(
-                                            isLogin: !widget.isLogin,
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline,
+                                        color: Color(0xFFFFB703),
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          "New user? We'll create your account automatically!",
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 12,
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                      );
-                                    },
-                                    child: Text(
-                                      widget.isLogin ? "Register" : "Login",
-                                      style: GoogleFonts.poppins(
-                                        color: const Color(0xFFFFB703),
-                                        fontWeight: FontWeight.w600,
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                // Send OTP button
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 56,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _sendOTP,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFFB703),
+                                      foregroundColor: Colors.black87,
+                                      disabledBackgroundColor: Colors.grey.shade300,
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      elevation: 5,
+                                    ),
+                                    child: _isLoading
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.black54),
+                                          ),
+                                        )
+                                      : Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(Icons.sms),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              "Send OTP",
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                // Terms and privacy
+                                Text(
+                                  "By continuing, you agree to our Terms of Service and Privacy Policy",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

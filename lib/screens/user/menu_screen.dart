@@ -1,10 +1,10 @@
 // lib/screens/user/menu_screen.dart
-import 'package:canteen_app/screens/user/cart_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:canteen_app/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:canteen_app/providers/cart_provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -49,9 +49,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "Menu",
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
@@ -131,7 +131,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: PopupMenuButton<String>(
-                    icon: const Icon(Icons.filter_list, color: Color(0xFF023047)),
+                    icon: const Icon(Icons.filter_list, color: Color(0xFFFFB703)),
                     tooltip: "Filter",
                     onSelected: (String value) {
                       setState(() {
@@ -218,224 +218,224 @@ class _MenuScreenState extends State<MenuScreen> {
                   // Filter items based on search text and veg/non-veg filter.
                   final filteredItems = items.where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    final name = (data['name'] ?? "").toString().toLowerCase();
-                    final searchText = searchController.text.toLowerCase();
-                    bool matchesSearch = name.contains(searchText);
+                    final name = (data['name'] ?? '').toString().toLowerCase();
+                    final isVeg = data['isVeg'] ?? false;
+                    final available = data['available'] ?? false;
 
-                    // Check the veg filter
-                    bool matchesFilter = true;
-                    if (filterOption == "Veg") {
-                      matchesFilter = data['isVeg'] == true;
-                    } else if (filterOption == "Non Veg") {
-                      matchesFilter = data['isVeg'] == false;
-                    }
-                    
+                    if (!available) return false;
+
+                    bool matchesSearch = name.contains(searchController.text.toLowerCase());
+                    bool matchesFilter = filterOption == "All" ||
+                        (filterOption == "Veg" && isVeg) ||
+                        (filterOption == "Non Veg" && !isVeg);
+
                     return matchesSearch && matchesFilter;
                   }).toList();
 
                   if (filteredItems.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off, size: 50, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          const Text("No matching items"),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                searchController.clear();
-                                filterOption = "All";
-                              });
-                            },
-                            child: const Text("Clear filters"),
-                          ),
-                        ],
-                      ),
-                    );
+                    return const Center(child: Text("No items found"));
                   }
 
                   return ListView.builder(
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(12),
                     itemCount: filteredItems.length,
                     itemBuilder: (context, index) {
                       final doc = filteredItems[index];
                       final data = doc.data() as Map<String, dynamic>;
                       final id = doc.id;
-                      final price = (data['price'] ?? 0.0) is double 
-                        ? (data['price'] ?? 0.0) 
-                        : double.parse((data['price'] ?? '0').toString());
-                      bool isVeg = data['isVeg'] ?? false;
+                      final name = data['name'] ?? 'Unnamed Item';
+                      final price = data['price']?.toString() ?? '0';
+                      final description = data['description'] ?? '';
+                      final isVeg = data['isVeg'] ?? false;
+                      final imageUrl = data['imageUrl'] ?? '';
 
-                      return Consumer<CartProvider>(
-                        builder: (context, cartProvider, child) {
-                          int quantity = cartProvider.getQuantity(id);
-                          
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFB703).withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
-                            elevation: 2,
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Food Image
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: data['imageUrl'] != null
-                                      ? Image.network(
-                                          data['imageUrl'],
-                                          width: 100,
-                                          height: 100,
+                          ],
+                          border: Border.all(
+                            color: const Color(0xFFFFB703).withOpacity(0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Food Image
+                              Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: const Color(0xFFFFB703).withOpacity(0.1),
+                                ),
+                                child: imageUrl.isNotEmpty
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(
+                                          imageUrl,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Container(
-                                            width: 100,
-                                            height: 100,
-                                            color: Colors.grey[300],
-                                            child: const Icon(Icons.restaurant, size: 40),
-                                          ),
-                                        )
-                                      : Container(
-                                          width: 100,
-                                          height: 100,
-                                          color: Colors.grey[300],
-                                          child: const Icon(Icons.restaurant, size: 40),
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Icon(
+                                              Icons.fastfood,
+                                              size: 40,
+                                              color: const Color(0xFFFFB703).withOpacity(0.7),
+                                            );
+                                          },
                                         ),
-                                  ),
-                                  
-                                  const SizedBox(width: 12),
-                                  
-                                  // Food details
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      )
+                                    : Icon(
+                                        Icons.fastfood,
+                                        size: 40,
+                                        color: const Color(0xFFFFB703).withOpacity(0.7),
+                                      ),
+                              ),
+                              const SizedBox(width: 12),
+                              
+                              // Item Details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
                                       children: [
-                                        Row(
-                                          children: [
-                                            // Veg/Non-veg indicator
-                                            Container(
-                                              padding: const EdgeInsets.all(2),
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: isVeg ? Colors.green : Colors.red,
-                                                ),
-                                              ),
-                                              child: Icon(
-                                                Icons.circle,
-                                                size: 8,
-                                                color: isVeg ? Colors.green : Colors.red,
-                                              ),
+                                        // Veg/Non-veg indicator
+                                        Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: isVeg ? Colors.green : Colors.red,
+                                              width: 1,
                                             ),
-                                            const SizedBox(width: 6),
-                                            // Item name
-                                            Expanded(
-                                              child: Text(
-                                                data['name'] ?? 'Food Item',
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Icon(
+                                            Icons.circle,
+                                            size: 8,
+                                            color: isVeg ? Colors.green : Colors.red,
+                                          ),
                                         ),
+                                        const SizedBox(width: 8),
                                         
-                                        const SizedBox(height: 4),
-                                        
-                                        // Description if available
-                                        if (data['description'] != null)
-                                          Text(
-                                            data['description'],
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
+                                        // Item name
+                                        Expanded(
+                                          child: Text(
+                                            name,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                            maxLines: 2,
+                                            maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          
-                                        const SizedBox(height: 8),
-                                        
-                                        // Price and add to cart row
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              "₹${price.toStringAsFixed(2)}",
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: Color(0xFFFFB703),
-                                              ),
-                                            ),
-                                            
-                                            // Add/Remove buttons
-                                            quantity > 0 
-                                              ? Row(
-                                                  children: [
-                                                    IconButton(
-                                                      onPressed: () => cartProvider.removeItem(id),
-                                                      icon: const Icon(Icons.remove_circle_outline),
-                                                      color: const Color(0xFFFFB703),
-                                                      padding: EdgeInsets.zero,
-                                                      constraints: const BoxConstraints(
-                                                        minWidth: 32,
-                                                        minHeight: 32,
-                                                      ),
-                                                    ),
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(0xFFFFB703).withOpacity(0.1),
-                                                        borderRadius: BorderRadius.circular(4),
-                                                      ),
-                                                      child: Text(
-                                                        quantity.toString(),
-                                                        style: const TextStyle(
-                                                          fontWeight: FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    IconButton(
-                                                      onPressed: () => cartProvider.addItem(id),
-                                                      icon: const Icon(Icons.add_circle_outline),
-                                                      color: const Color(0xFFFFB703),
-                                                      padding: EdgeInsets.zero,
-                                                      constraints: const BoxConstraints(
-                                                        minWidth: 32,
-                                                        minHeight: 32,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                )
-                                              : ElevatedButton(
-                                                  onPressed: () => cartProvider.addItem(id),
-                                                  style: ElevatedButton.styleFrom(
-                                                    backgroundColor: const Color(0xFFFFB703),
-                                                    foregroundColor: Colors.white,
-                                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                                    minimumSize: const Size(40, 30),
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius: BorderRadius.circular(16),
-                                                    ),
-                                                  ),
-                                                  child: const Text("ADD"),
-                                                ),
-                                          ],
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                    
+                                    if (description.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        description,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                    
+                                    const SizedBox(height: 8),
+                                    
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Price
+                                        Text(
+                                          "₹$price",
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFFFFB703),
+                                          ),
+                                        ),
+                                        
+                                        // Add to cart button
+                                        Consumer<CartProvider>(
+                                          builder: (context, cartProvider, child) {
+                                            final quantity = cartProvider.getQuantity(id);
+                                            return quantity > 0
+                                                ? Row(
+                                                    children: [
+                                                      IconButton(
+                                                        onPressed: () => cartProvider.removeItem(id),
+                                                        icon: const Icon(Icons.remove_circle_outline),
+                                                        color: const Color(0xFFFFB703),
+                                                        padding: EdgeInsets.zero,
+                                                        constraints: const BoxConstraints(
+                                                          minWidth: 32,
+                                                          minHeight: 32,
+                                                        ),
+                                                      ),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFFFB703),
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          quantity.toString(),
+                                                          style: const TextStyle(
+                                                            color: Colors.white,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      IconButton(
+                                                        onPressed: () => cartProvider.addItem(id),
+                                                        icon: const Icon(Icons.add_circle_outline),
+                                                        color: const Color(0xFFFFB703),
+                                                        padding: EdgeInsets.zero,
+                                                        constraints: const BoxConstraints(
+                                                          minWidth: 32,
+                                                          minHeight: 32,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  )
+                                                : ElevatedButton(
+                                                    onPressed: () => cartProvider.addItem(id),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: const Color(0xFFFFB703),
+                                                      foregroundColor: Colors.white,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                                      minimumSize: const Size(40, 30),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(16),
+                                                      ),
+                                                    ),
+                                                    child: const Text("ADD"),
+                                                  );
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            ],
+                          ),
+                        ),
                       );
                     },
                   );
@@ -451,7 +451,7 @@ class _MenuScreenState extends State<MenuScreen> {
               // Navigate to cart screen
               Navigator.pushNamed(context, '/cart');
             },
-            backgroundColor: const Color(0xFF023047),
+            backgroundColor: const Color(0xFFFFB703),
             icon: Stack(
               children: [
                 const Icon(Icons.shopping_cart, color: Colors.white),
@@ -462,7 +462,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFB703),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       constraints: const BoxConstraints(
@@ -472,7 +472,7 @@ class _MenuScreenState extends State<MenuScreen> {
                       child: Text(
                         '${cartProvider.itemCount}',
                         style: const TextStyle(
-                          color: Colors.black,
+                          color: Color(0xFFFFB703),
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),

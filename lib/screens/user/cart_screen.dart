@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:canteen_app/providers/cart_provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({Key? key}) : super(key: key);
@@ -82,67 +83,68 @@ class _CartScreenState extends State<CartScreen> {
         'contact': '',
         'email': FirebaseAuth.instance.currentUser?.email ?? '',
       },
-      'currency': 'INR',
       'theme': {
-        'color': '#FFB703',
+        'color': '#FFB703'
       }
     };
 
     try {
       _razorpay.open(options);
     } catch (e) {
-      debugPrint("Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Payment error: ${e.toString()}")),
+        SnackBar(content: Text("Error: ${e.toString()}")),
       );
     }
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    // Show loading indicator
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+    
+    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFFFFB703),
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text("Processing order..."),
+          ],
         ),
       ),
     );
-    
+
     try {
+      // Create order in Firestore
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      final orderData = <String, dynamic>{
+        'userId': user?.uid ?? '',
+        'items': <String, dynamic>{}, // Fixed: Explicit Map type
+        'total': total,
+        'status': 'Placed',
+        'timestamp': FieldValue.serverTimestamp(),
+        'paymentId': response.paymentId,
+      };
 
-      final cartProvider = Provider.of<CartProvider>(context, listen: false);
+      // Add items to order - Fixed the type issue
       final Map<String, dynamic> orderItems = {};
-
-      cartProvider.cart.forEach((itemId, qty) {
-        final itemData = menuMap[itemId];
-        if (itemData != null) {
+      cartProvider.cart.forEach((itemId, quantity) {
+        final item = menuMap[itemId];
+        if (item != null) {
           orderItems[itemId] = {
-            'name': itemData['name'] ?? 'Unknown',
-            'price': itemData['price'] ?? 0,
-            'quantity': qty,
-            'subtotal': (itemData['price'] ?? 0) * qty,
+            'name': item['name'],
+            'price': item['price'],
+            'quantity': quantity,
+            'subtotal': item['price'] * quantity,
           };
         }
       });
+      orderData['items'] = orderItems; // Assign the complete map
 
-      final order = {
-        'userId': user.uid,
-        'userEmail': user.email,
-        'items': orderItems,
-        'status': 'Placed',
-        'timestamp': Timestamp.now(),
-        'total': total,
-        'paymentId': response.paymentId,
-        'paymentStatus': 'success',
-      };
-
-      await FirebaseFirestore.instance.collection('orders').add(order);
+      final docRef = await FirebaseFirestore.instance.collection('orders').add(orderData);
       
-      // Clear the cart using provider
+      // Clear cart
       cartProvider.clearCart();
       
       // Close loading dialog
@@ -165,19 +167,18 @@ class _CartScreenState extends State<CartScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
-                  Icons.check_circle, 
-                  color: Colors.green, 
-                  size: 30,
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 32,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  "Order Placed Successfully!",
-                  style: TextStyle(
-                    fontSize: 18,
+                  "Order Placed!",
+                  style: GoogleFonts.poppins(
                     fontWeight: FontWeight.bold,
-                    color: Colors.green.shade700,
+                    color: Colors.green,
                   ),
                 ),
               ),
@@ -187,89 +188,42 @@ class _CartScreenState extends State<CartScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                "Your order has been placed successfully.",
+                style: GoogleFonts.poppins(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFB703).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFFFB703).withOpacity(0.3),
-                  ),
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Your order has been placed successfully and will be prepared shortly.",
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Order Total:",
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        Text(
-                          "₹${total.toStringAsFixed(2)}",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFFB703),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      "Order Details:",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Payment ID:",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            response.paymentId ?? 'N/A',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      "Order ID: ${docRef.id.substring(0, 8).toUpperCase()}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: Colors.grey,
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.info_outline,
-                      color: Colors.blue,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "You can track your order status and get updates on preparation time.",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.blue.shade700,
-                        ),
+                    Text(
+                      "Payment ID: ${response.paymentId?.substring(0, 16) ?? 'N/A'}",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                        color: Colors.grey,
                       ),
                     ),
                   ],
@@ -281,7 +235,6 @@ class _CartScreenState extends State<CartScreen> {
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.pop(context); // Close success dialog
-                // Navigate to order tracking and clear navigation stack
                 Navigator.pushNamedAndRemoveUntil(
                   context, 
                   '/track',
@@ -319,76 +272,43 @@ class _CartScreenState extends State<CartScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text("Payment failed! Tap to retry."),
+        backgroundColor: Colors.red,
         action: SnackBarAction(
-          label: 'Retry',
+          label: "RETRY",
+          textColor: Colors.white,
           onPressed: startPayment,
         ),
-        backgroundColor: Colors.red,
       ),
     );
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("External Wallet selected.")),
+      SnackBar(content: Text("External Wallet: ${response.walletName}")),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<CartProvider>(
-      builder: (context, cartProvider, child) {
-        // Recalculate total when cart changes
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          recalcTotal();
-        });
-
-        return Scaffold(
-          backgroundColor: Colors.grey[100],
-          appBar: AppBar(
-            backgroundColor: const Color(0xFFFFB703),
-            title: const Text(
-              "Your Cart",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            elevation: 0,
-            actions: [
-              if (!cartProvider.isEmpty)
-                TextButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text("Clear Cart"),
-                        content: const Text("Are you sure you want to clear your cart?"),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text("CANCEL"),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              cartProvider.clearCart();
-                            },
-                            child: const Text("CLEAR"),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.delete_outline, color: Colors.white),
-                  label: const Text(
-                    "Clear",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          "Cart",
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
-          body: isLoading
+        ),
+        backgroundColor: const Color(0xFFFFB703),
+      ),
+      body: Consumer<CartProvider>(
+        builder: (context, cartProvider, child) {
+          // Recalculate total when cart changes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            recalcTotal();
+          });
+
+          return isLoading
               ? const Center(
                   child: CircularProgressIndicator(
                     color: Color(0xFFFFB703),
@@ -473,16 +393,18 @@ class _CartScreenState extends State<CartScreen> {
                                 if (item == null) return const SizedBox();
                                 final price = item['price'] ?? 0;
                                 final isVeg = item['isVeg'] ?? false;
+                                final imageUrl = item['imageUrl'] ?? '';
+                                final name = item['name'] ?? 'Unknown Item';
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.05),
-                                        blurRadius: 5,
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 8,
                                         offset: const Offset(0, 2),
                                       ),
                                     ],
@@ -490,106 +412,95 @@ class _CartScreenState extends State<CartScreen> {
                                   child: Padding(
                                     padding: const EdgeInsets.all(12),
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Food image
-                                        Stack(
-                                          children: [
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.circular(8),
-                                              child: item['imageUrl'] != null
-                                                  ? Image.network(
-                                                      item['imageUrl'],
-                                                      width: 80,
-                                                      height: 80,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (_, __, ___) => Container(
-                                                        width: 80,
-                                                        height: 80,
-                                                        color: Colors.grey[200],
-                                                        child: Icon(
-                                                          Icons.restaurant,
-                                                          size: 40,
-                                                          color: Colors.grey[400],
-                                                        ),
-                                                      ),
-                                                    )
-                                                  : Container(
-                                                      width: 80,
-                                                      height: 80,
-                                                      color: Colors.grey[200],
-                                                      child: Icon(
-                                                        Icons.restaurant,
-                                                        size: 40,
-                                                        color: Colors.grey[400],
-                                                      ),
-                                                    ),
-                                            ),
-                                            // Veg/Non-veg indicator
-                                            Positioned(
-                                              top: 0,
-                                              left: 0,
-                                              child: Container(
-                                                padding: const EdgeInsets.all(4),
-                                                decoration: BoxDecoration(
-                                                  color: isVeg ? Colors.green : Colors.red,
-                                                  borderRadius: const BorderRadius.only(
-                                                    topLeft: Radius.circular(8),
-                                                    bottomRight: Radius.circular(8),
+                                        // Food Image
+                                        Container(
+                                          width: 70,
+                                          height: 70,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(12),
+                                            color: const Color(0xFFFFB703).withOpacity(0.1),
+                                          ),
+                                          child: imageUrl.isNotEmpty
+                                              ? ClipRRect(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  child: Image.network(
+                                                    imageUrl,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return Icon(
+                                                        Icons.fastfood,
+                                                        size: 30,
+                                                        color: const Color(0xFFFFB703).withOpacity(0.7),
+                                                      );
+                                                    },
                                                   ),
+                                                )
+                                              : Icon(
+                                                  Icons.fastfood,
+                                                  size: 30,
+                                                  color: const Color(0xFFFFB703).withOpacity(0.7),
                                                 ),
-                                                child: Icon(
-                                                  Icons.circle,
-                                                  size: 8,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
                                         ),
                                         const SizedBox(width: 12),
                                         
-                                        // Dish details
+                                        // Item Details
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(
-                                                item['name'] ?? 'Item',
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF023047),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              if (item['description'] != null)
-                                                Text(
-                                                  item['description'],
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              const SizedBox(height: 8),
                                               Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  // Veg/Non-veg indicator
+                                                  Container(
+                                                    padding: const EdgeInsets.all(2),
+                                                    decoration: BoxDecoration(
+                                                      border: Border.all(
+                                                        color: isVeg ? Colors.green : Colors.red,
+                                                        width: 1,
+                                                      ),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.circle,
+                                                      size: 8,
+                                                      color: isVeg ? Colors.green : Colors.red,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  
+                                                  // Item name
+                                                  Expanded(
+                                                    child: Text(
+                                                      name,
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              
+                                              // Price and quantity info
+                                              Row(
                                                 children: [
                                                   Text(
-                                                    "₹${price.toStringAsFixed(2)} × $quantity",
-                                                    style: TextStyle(
+                                                    "₹$price",
+                                                    style: GoogleFonts.poppins(
                                                       fontSize: 14,
-                                                      color: Colors.grey[700],
+                                                      fontWeight: FontWeight.w600,
+                                                      color: const Color(0xFFFFB703),
                                                     ),
                                                   ),
                                                   Text(
-                                                    "₹${(price * quantity).toStringAsFixed(2)}",
-                                                    style: const TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Color(0xFFFFB703),
+                                                    " × $quantity = ₹${(price * quantity).toStringAsFixed(2)}",
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
                                                     ),
                                                   ),
                                                 ],
@@ -610,7 +521,7 @@ class _CartScreenState extends State<CartScreen> {
                                                         IconButton(
                                                           icon: const Icon(
                                                             Icons.remove_circle_outline,
-                                                            color: Color(0xFF023047),
+                                                            color: Color(0xFFFFB703),
                                                             size: 20,
                                                           ),
                                                           onPressed: () => cartProvider.removeItem(itemId),
@@ -640,10 +551,10 @@ class _CartScreenState extends State<CartScreen> {
                                                         IconButton(
                                                           icon: const Icon(
                                                             Icons.add_circle_outline,
-                                                            color: Color(0xFF023047),
+                                                            color: Color(0xFFFFB703),
                                                             size: 20,
                                                           ),
-                                                          onPressed: () => cartProvider.addItem(itemId),
+                                                          onPressed: () => cartProvider.addItem(itemId), // Fixed: Only one argument
                                                           constraints: const BoxConstraints(
                                                             minWidth: 32,
                                                             minHeight: 32,
@@ -699,75 +610,65 @@ class _CartScreenState extends State<CartScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Bill details
-                            const Text(
+                            Text(
                               "BILL DETAILS",
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF023047),
+                                color: const Color(0xFFFFB703),
                               ),
                             ),
+                            const SizedBox(height: 12),
+                            
+                            // Subtotal
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "Subtotal",
+                                  style: GoogleFonts.poppins(fontSize: 14),
+                                ),
+                                Text(
+                                  "₹${total.toStringAsFixed(2)}",
+                                  style: GoogleFonts.poppins(fontSize: 14),
+                                ),
+                              ],
+                            ),
                             const SizedBox(height: 8),
+                            
+                            // Taxes (GST)
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  "Item Total",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
-                                  ),
+                                  "GST (5%)",
+                                  style: GoogleFonts.poppins(fontSize: 14),
                                 ),
                                 Text(
-                                  "₹${total.toStringAsFixed(2)}",
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  "₹${(total * 0.05).toStringAsFixed(2)}",
+                                  style: GoogleFonts.poppins(fontSize: 14),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
+                            const Divider(thickness: 1),
+                            
+                            // Total
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  "GST",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                                const Text(
-                                  "Included",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            const Divider(),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  "Grand Total",
-                                  style: TextStyle(
+                                  "Total",
+                                  style: GoogleFonts.poppins(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF023047),
                                   ),
                                 ),
                                 Text(
-                                  "₹${total.toStringAsFixed(2)}",
-                                  style: const TextStyle(
+                                  "₹${(total * 1.05).toStringAsFixed(2)}",
+                                  style: GoogleFonts.poppins(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFFFFB703),
+                                    color: const Color(0xFFFFB703),
                                   ),
                                 ),
                               ],
@@ -777,30 +678,22 @@ class _CartScreenState extends State<CartScreen> {
                             // Place order button
                             SizedBox(
                               width: double.infinity,
-                              height: 50,
                               child: ElevatedButton(
                                 onPressed: startPayment,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFFFB703),
                                   foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  elevation: 0,
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.payment),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      "Place Order • ₹${total.toStringAsFixed(2)}",
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                                child: Text(
+                                  "PLACE ORDER - ₹${(total * 1.05).toStringAsFixed(2)}",
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
@@ -808,9 +701,9 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                       ),
                   ],
-                ),
-        );
-      },
+                );
+        },
+      ),
     );
   }
 }

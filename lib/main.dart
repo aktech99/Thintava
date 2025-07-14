@@ -1,4 +1,4 @@
-// lib/main.dart - MINIMAL VERSION for debugging
+// lib/main.dart - FIXED VERSION with proper certificate handling
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +17,7 @@ void main() async {
     // Initialize Firebase with minimal configuration
     await Firebase.initializeApp();
     print('✅ Firebase initialized successfully');
+    
   } catch (e) {
     print('❌ Firebase initialization failed: $e');
   }
